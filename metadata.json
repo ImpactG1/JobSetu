@@ -1,0 +1,6 @@
+{
+  "name": "Elite HR",
+  "description": "An executive recruitment portal and candidate intelligence dashboard equipped with AI email writing assistants, referral pipelines, and strategic analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
