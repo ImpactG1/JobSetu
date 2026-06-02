@@ -7,22 +7,19 @@ import { InboxBoard } from './components/InboxBoard';
 import { ReferralsBoard } from './components/ReferralsBoard';
 import { AnalyticsBoard } from './components/AnalyticsBoard';
 import { SettingsBoard } from './components/SettingsBoard';
+import { ProfileBoard } from './components/ProfileBoard';
+import { ATSCheckerBoard } from './components/ATSCheckerBoard';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthPage } from './components/AuthPage';
 import { useAuth } from './context/AuthContext';
 import { checkIsAdmin } from './lib/adminConfig';
 import { fetchDirectJobs, fetchReferralOpportunities } from './lib/supabaseData';
+import { fetchUserProfile } from './lib/profileService';
+import { parseResumeSkillsString } from './lib/resumeMatcher';
 
-import { ActiveTab, UserProfile, EmailThread, ReferralCandidate, EmailTemplate, DirectJob, ReferralOpportunity } from './types';
+import { ActiveTab, UserProfile, ReferralCandidate, EmailTemplate, DirectJob, ReferralOpportunity } from './types';
 import { 
   PROFILES, 
-  HOME_KPI_CARDS, 
-  TIMELINE_ITEMS, 
-  SAVED_JOBS, 
-  FOLLOW_UP_REMINDERS, 
-  TRENDING_OPPORTUNITIES, 
-  DISCOVERY_JOBS, 
-  EMAIL_THREADS, 
   REFERRAL_STATUSES, 
   TOP_REFERRERS, 
   EMAIL_TEMPLATES 
@@ -75,26 +72,38 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
   const [realJobs, setRealJobs] = useState<DirectJob[]>([]);
   const [realReferrals, setRealReferrals] = useState<ReferralOpportunity[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [resumeSkills, setResumeSkills] = useState<string[]>([]);
+  const [experienceLevel, setExperienceLevel] = useState<'junior' | 'mid' | 'senior' | 'lead' | undefined>();
 
   useEffect(() => {
-    // Check admin status
     checkIsAdmin(userId).then(setIsAdmin);
 
-    // Fetch real data from Supabase
-    Promise.all([fetchDirectJobs(), fetchReferralOpportunities()])
-      .then(([jobs, refs]) => {
+    Promise.all([fetchDirectJobs(), fetchReferralOpportunities(), fetchUserProfile(userId)])
+      .then(([jobs, refs, profile]) => {
         setRealJobs(jobs);
         setRealReferrals(refs);
+        if (profile?.resume_skills) {
+          setResumeSkills(parseResumeSkillsString(profile.resume_skills));
+        }
+        const ats = profile?.ats_analysis as { experience_level?: string } | undefined;
+        if (ats?.experience_level && ['junior', 'mid', 'senior', 'lead'].includes(ats.experience_level)) {
+          setExperienceLevel(ats.experience_level as 'junior' | 'mid' | 'senior' | 'lead');
+        }
         setDataLoaded(true);
       })
       .catch(() => setDataLoaded(true));
   }, [userId]);
 
+  const handleResumeAnalysisUpdate = (skills: string[], level?: 'junior' | 'mid' | 'senior' | 'lead') => {
+    setResumeSkills(skills);
+    if (level) setExperienceLevel(level);
+  };
+
   const buildInitialProfile = (): UserProfile => {
     if (userName || userEmail) {
       return {
         name: userName || userEmail.split('@')[0] || 'User',
-        role: isAdmin ? 'Administrator' : 'Executive Recruiter',
+        role: isAdmin ? 'Administrator' : 'Job Seeker',
         avatar: PROFILES[0].avatar,
         email: userEmail || '',
       };
@@ -112,36 +121,10 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
     }
   }, [isAdmin]);
 
-  // Core Data Collections (mock data for non-Supabase sections)
-  const [kpiCards, setKpiCards] = useState(HOME_KPI_CARDS);
-  const [timelineItems, setTimelineItems] = useState(TIMELINE_ITEMS);
-  const [savedJobs, setSavedJobs] = useState(SAVED_JOBS);
-  const [reminders, setReminders] = useState(FOLLOW_UP_REMINDERS);
-  const [trendingOpportunities, setTrendingOpportunities] = useState(TRENDING_OPPORTUNITIES);
-  const [discoveryJobs, setDiscoveryJobs] = useState(DISCOVERY_JOBS);
-  const [emailThreads, setEmailThreads] = useState<EmailThread[]>(EMAIL_THREADS);
+  // Data Collections (only what's still needed)
   const [referrals, setReferrals] = useState<ReferralCandidate[]>(REFERRAL_STATUSES);
   const [topReferrers, setTopReferrers] = useState(TOP_REFERRERS);
   const [templates, setTemplates] = useState<EmailTemplate[]>(EMAIL_TEMPLATES);
-
-  // Update KPIs with real data counts
-  useEffect(() => {
-    if (dataLoaded) {
-      setKpiCards(prev => prev.map(k => {
-        if (k.title === 'Applications Tracked') return { ...k, value: String(realJobs.length), change: 'Live Data', isPositive: true };
-        if (k.title === 'Referrals Made') return { ...k, value: String(realReferrals.length), change: 'Live Data', isPositive: true };
-        return k;
-      }));
-    }
-  }, [dataLoaded, realJobs.length, realReferrals.length]);
-
-  const handleToggleFavoriteTrend = (id: string) => {
-    setTrendingOpportunities(prev => prev.map(item => item.id === id ? { ...item, isFavorite: !item.isFavorite } : item));
-  };
-
-  const handleToggleFavoriteJob = (id: string) => {
-    setDiscoveryJobs(prev => prev.map(item => item.id === id ? { ...item, isFavorite: !item.isFavorite } : item));
-  };
 
   const handleUpdateReferralStage = (id: string, newStage: 'referred' | 'screening' | 'interviewing' | 'hired') => {
     const stageStatusTextMap: Record<string, string> = {
@@ -150,27 +133,11 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
       hired: `Closed - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     };
     setReferrals(prev => prev.map(cand => cand.id === id ? { ...cand, stage: newStage, statusText: stageStatusTextMap[newStage] } : cand));
-    if (newStage === 'hired') {
-      setTimelineItems(prev => [{ id: `timeline-hired-${Date.now()}`, title: 'Referral Pipeline Placed!', description: 'A referred candidate has been elevated to Hired status.', time: 'Just now', type: 'offer', isHighPriority: true }, ...prev]);
-    }
   };
 
   const handleAddReferral = (candidateName: string, role: string, department: string, source: string) => {
     const newRef: ReferralCandidate = { id: `ref-dynamic-${Date.now()}`, name: candidateName, role, department: department as any, stage: 'referred', source: source as any, statusText: 'Direct Referral' };
     setReferrals(prev => [newRef, ...prev]);
-    setTimelineItems(prev => [{ id: `timeline-add-${Date.now()}`, title: 'New Candidate Submitted', description: `Successfully referred ${candidateName} for the ${role} position.`, time: 'Just now', type: 'referral' }, ...prev]);
-    setKpiCards(prev => prev.map(k => k.title === 'Referrals Made' ? { ...k, value: String(parseInt(k.value) + 1) } : k));
-  };
-
-  const handleSendReply = (threadId: string, replyBody: string) => {
-    setEmailThreads(prev => prev.map(th => {
-      if (th.id === threadId) {
-        return { ...th, status: 'Sent', time: 'Just now', tags: ['Sent', 'Awaiting Action'], conversation: [...th.conversation, { senderName: currentProfile.name, senderEmail: currentProfile.email, avatarUrl: currentProfile.avatar, time: 'Just now', body: replyBody, isUser: true }] };
-      }
-      return th;
-    }));
-    setTimelineItems(prev => [{ id: `timeline-email-${Date.now()}`, title: 'Recruited Correspondence Sent', description: 'Sent strategic follow-up email response.', time: 'Just now', type: 'update' }, ...prev]);
-    setKpiCards(prev => prev.map(k => k.title === 'Emails Sent' ? { ...k, value: String(parseInt(k.value.replace(/,/g, '')) + 1) } : k));
   };
 
   const handleUpdateProfile = (updatedProfile: UserProfile) => {
@@ -182,36 +149,51 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
     setTemplates(prev => prev.map(tpl => tpl.id === templateId ? { ...tpl, ...updatedFields } : tpl));
   };
 
-  const unreadInboxCount = emailThreads.filter(t => t.status === 'Opened').length;
-
   const renderActiveView = () => {
     switch (activeTab) {
       case 'home':
         return (
           <HomeDashboard
-            currentProfile={currentProfile} kpis={kpiCards} timeline={timelineItems}
-            savedJobs={savedJobs} reminders={reminders} trending={trendingOpportunities}
-            onToggleFavoriteTrend={handleToggleFavoriteTrend}
+            currentProfile={currentProfile}
+            userId={userId}
+            totalJobs={realJobs.length}
+            totalReferrals={realReferrals.length}
             onNavigateToTab={(tab) => { setActiveTab(tab); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            onReferCandidate={() => { setActiveTab('referrals'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             searchQuery={searchQuery}
             realReferrals={realReferrals}
           />
         );
+      case 'profile':
+        return (
+          <ProfileBoard
+            userId={userId}
+            realJobs={realJobs}
+            realReferrals={realReferrals}
+            onResumeAnalysisUpdate={handleResumeAnalysisUpdate}
+          />
+        );
+      case 'ats-checker':
+        return <ATSCheckerBoard />;
       case 'discovery':
         return (
           <DiscoveryBoard
-            jobs={discoveryJobs} onToggleFavoriteJob={handleToggleFavoriteJob}
-            onAddReferral={handleAddReferral} searchQuery={searchQuery}
+            searchQuery={searchQuery}
             realJobs={realJobs}
+            realReferrals={realReferrals}
+            templates={templates}
+            userId={userId}
+            userEmail={userEmail}
+            userName={userName || currentProfile.name}
+            resumeSkills={resumeSkills}
+            experienceLevel={experienceLevel}
           />
         );
       case 'inbox':
-        return <InboxBoard threads={emailThreads} currentProfile={currentProfile} onSendReply={handleSendReply} searchQuery={searchQuery} />;
+        return <InboxBoard searchQuery={searchQuery} />;
       case 'referrals':
         return <ReferralsBoard referrals={referrals} topReferrers={topReferrers} onUpdateStage={handleUpdateReferralStage} onAddReferral={handleAddReferral} />;
       case 'analytics':
-        return <AnalyticsBoard />;
+        return <AnalyticsBoard userId={userId} totalJobs={realJobs.length} totalReferrals={realReferrals.length} />;
       case 'settings':
         return <SettingsBoard currentProfile={currentProfile} profiles={profiles} onUpdateProfile={handleUpdateProfile} templates={templates} onUpdateTemplate={handleUpdateTemplate} />;
       case 'admin':
@@ -228,12 +210,9 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
         currentProfile={currentProfile} profiles={profiles}
         onProfileChange={(newProf) => {
           setCurrentProfile(newProf);
-          if (newProf.name === 'Alex Mercer') setActiveTab('inbox');
-          else if (newProf.name === 'Alex Sterling') setActiveTab('referrals');
-          else if (newProf.name === 'Arthur Sterling') setActiveTab('analytics');
-          else setActiveTab('home');
+          setActiveTab('home');
         }}
-        unreadCount={unreadInboxCount} onSignOut={onSignOut} isAdmin={isAdmin}
+        unreadCount={0} onSignOut={onSignOut} isAdmin={isAdmin}
       />
       <div className="flex-1 flex flex-col min-w-0">
         <Header currentProfile={currentProfile} activeTab={activeTab} onSearch={(val) => setSearchQuery(val)} onSignOut={onSignOut} />

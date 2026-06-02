@@ -11,24 +11,13 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Initialize Gemini safely to prevent crash on startup if key is missing
-let aiClient: any = null;
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.trim() === '') {
+// Helper function for Groq API
+function getGroqKey() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === 'your_groq_api_key' || apiKey.trim() === '') {
     return null;
   }
-  if (!aiClient) {
-    aiClient = new GoogleGenAI({
-      apiKey: apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-  }
-  return aiClient;
+  return apiKey;
 }
 
 // REST API for Email Refinement
@@ -39,11 +28,10 @@ app.post('/api/gemini/refine', async (req, res) => {
     return res.status(400).json({ error: 'Text content is required' });
   }
 
-  const client = getGeminiClient();
+  const groqKey = getGroqKey();
 
-  if (client) {
+  if (groqKey) {
     try {
-      // Craft an exact prompt for the Gemini 3.5 Flash model
       const systemInstruction = `You are an elite executive talent AI recruiter at Elite HR Global. 
       You communicate with professional intelligence, authority, and warmth. 
       Your task is to refine email correspondence to match the user's selected tone perfectly, preserving all template variables like {first_name}, {company}, {position}, and {sender_name} unchanged.`;
@@ -72,22 +60,35 @@ app.post('/api/gemini/refine', async (req, res) => {
       Email to refine:
       "${text}"`;
 
-      const response = await client.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: prompt }
+          ],
           temperature: 0.7,
-        }
+          response_format: { type: 'json_object' },
+        })
       });
 
-      const responseText = response.text || '';
+      if (!response.ok) {
+        throw new Error('Groq API error for email refinement');
+      }
+
+      const data = await response.json();
+      const responseText = data.choices?.[0]?.message?.content || '';
+      
       try {
         const parsed = JSON.parse(responseText.trim());
         return res.json({ ...parsed, isMocked: false });
       } catch (parseErr) {
-        console.error('Failed to parse Gemini output as JSON:', responseText);
+        console.error('Failed to parse Groq output as JSON:', responseText);
         // Fallback to manual parser helper or direct text
         return res.json({
           refinedText: responseText || text,
@@ -105,7 +106,7 @@ app.post('/api/gemini/refine', async (req, res) => {
         });
       }
     } catch (err: any) {
-      console.error('Gemini API call failed, falling back to local text processing:', err.message);
+      console.error('Groq API call failed, falling back to local text processing:', err.message);
       // Fallback gracefully instead of failing
     }
   }
@@ -172,13 +173,98 @@ Elite HR Global`;
       sentiment
     },
     isMocked: true,
-    info: 'Using high-contrast offline HR logic. Configure GEMINI_API_KEY for custom live AI refinement.'
+    info: 'Using high-contrast offline HR logic. Configure GROQ_API_KEY for custom live AI refinement.'
   });
+});
+
+// ─── Groq API: Resume Skills Extraction ─────────────────────
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+app.post('/api/groq/resume-skills', async (req, res) => {
+  const { text } = req.body;
+
+  if (!text || typeof text !== 'string' || text.trim().length < 20) {
+    return res.status(400).json({ error: 'Resume text is required (minimum 20 characters)' });
+  }
+
+  // Sanitize: limit to 8000 chars to prevent abuse
+  const sanitizedText = text.slice(0, 8000);
+
+  const groqKey = process.env.GROQ_API_KEY;
+  if (groqKey && groqKey.trim() !== '' && groqKey !== 'your_groq_api_key') {
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a professional resume analyst. Extract all technical skills, soft skills, tools, frameworks, programming languages, and domain expertise from the given resume text. Return a JSON object with a single key "skills" containing an array of skill strings. Be thorough — include all skills mentioned directly or implied. Return ONLY valid JSON, no markdown.`
+            },
+            {
+              role: 'user',
+              content: `Extract all skills from this resume:\n\n${sanitizedText}`
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 1024,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error('[Groq] API call failed:', errData);
+        throw new Error('Groq API error');
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '{}';
+
+      try {
+        const parsed = JSON.parse(content);
+        const skills = Array.isArray(parsed.skills) ? parsed.skills : [];
+        return res.json({ skills, isMocked: false });
+      } catch (parseErr) {
+        console.error('[Groq] Failed to parse response:', content);
+        throw new Error('Parse error');
+      }
+    } catch (err: any) {
+      console.error('[Groq] Falling back to local extraction:', err.message);
+    }
+  }
+
+  // Fallback: local keyword extraction
+  const SKILL_KEYWORDS = [
+    'javascript', 'typescript', 'python', 'java', 'react', 'angular', 'vue',
+    'node', 'express', 'sql', 'postgresql', 'mongodb', 'aws', 'azure', 'gcp',
+    'docker', 'kubernetes', 'git', 'html', 'css', 'tailwind', 'figma',
+    'product management', 'project management', 'agile', 'scrum', 'leadership',
+    'marketing', 'sales', 'analytics', 'data science', 'machine learning',
+    'ai', 'deep learning', 'nlp', 'devops', 'ci/cd', 'testing', 'automation',
+    'communication', 'teamwork', 'problem solving', 'strategic planning',
+    'finance', 'accounting', 'operations', 'supply chain', 'recruitment',
+    'c++', 'c#', '.net', 'ruby', 'rails', 'php', 'laravel', 'swift',
+    'kotlin', 'flutter', 'react native', 'next.js', 'graphql', 'rest api',
+    'linux', 'networking', 'cybersecurity', 'blockchain', 'web3',
+    'excel', 'powerpoint', 'tableau', 'power bi', 'sap', 'salesforce',
+  ];
+
+  const textLower = sanitizedText.toLowerCase();
+  const found = SKILL_KEYWORDS.filter(s => textLower.includes(s));
+
+  return res.json({ skills: found, isMocked: true });
 });
 
 // Serve health status
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Elite HR Server', hasGeminiKey: !!process.env.GEMINI_API_KEY });
+  res.json({ status: 'ok', service: 'Elite HR Server', hasGroqKey: !!process.env.GROQ_API_KEY });
 });
 
 // Configure Vite or Static Asset delivery

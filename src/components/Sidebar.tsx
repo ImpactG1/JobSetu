@@ -9,7 +9,8 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardCheck
 } from 'lucide-react';
 import { ActiveTab, UserProfile } from '../types';
 
@@ -36,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const menuItems = [
     { id: 'home' as ActiveTab, label: 'Dashboard', icon: Home },
+    { id: 'ats-checker' as ActiveTab, label: 'ATS Checker', icon: ClipboardCheck },
     { id: 'discovery' as ActiveTab, label: 'Discovery', icon: Search },
     { id: 'inbox' as ActiveTab, label: 'Inbox', icon: Mail, badge: unreadCount },
     { id: 'referrals' as ActiveTab, label: 'Referrals', icon: Users },
@@ -118,16 +120,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Viewing Session As
         </label>
         <div className="relative group">
-          <select
-            value={currentProfile.name}
-            onChange={(e) => {
-              const matched = profiles.find(p => p.name === e.target.value);
-              if (matched) onProfileChange(matched);
-            }}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            title="Switch Executive Profile"
-          />
-          <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-[#ecebe6] group-hover:border-neutral-300 transition-colors pointer-events-none">
+          <button
+            onClick={() => setActiveTab('profile')}
+            className="w-full flex items-center justify-between p-2 rounded-lg bg-white border border-[#ecebe6] hover:border-neutral-300 transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-neutral-900/10"
+            title="View and Edit Profile"
+          >
             <div className="flex items-center space-x-2.5 min-w-0">
               <img
                 src={currentProfile.avatar}
@@ -145,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
             <ChevronRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-600 transition-transform group-hover:translate-x-0.5 shrink-0" />
-          </div>
+          </button>
         </div>
 
         {/* Sign Out Button */}

@@ -1,4 +1,4 @@
-export type ActiveTab = 'home' | 'discovery' | 'inbox' | 'referrals' | 'analytics' | 'settings' | 'admin';
+export type ActiveTab = 'home' | 'profile' | 'ats-checker' | 'discovery' | 'inbox' | 'referrals' | 'analytics' | 'settings' | 'admin';
 
 export interface UserProfile {
   name: string;
@@ -162,4 +162,123 @@ export interface EmailTemplate {
   body: string;
   category: 'Cold Outreach' | 'Follow-up' | 'Rejection' | 'Offer Letter' | 'Referral';
   variables: string[];
+}
+
+// ─── Gmail Integration Types ──────────────────────────────
+
+export interface EmailActivity {
+  id: string;
+  user_id: string;
+  recipient_email: string;
+  recipient_name: string;
+  subject: string;
+  body: string;
+  company: string;
+  job_title: string;
+  gmail_message_id: string;
+  status: 'sent' | 'delivered' | 'replied' | 'bounced';
+  sent_at: string;
+  created_at: string;
+}
+
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  fromName: string;
+  to: string;
+  subject: string;
+  snippet: string;
+  body: string;
+  date: string;
+  isRead: boolean;
+  labels: string[];
+}
+
+export interface EmailAttachment {
+  filename: string;
+  mimeType: string;
+  base64Data: string;
+}
+
+export type ExperienceLevel = 'junior' | 'mid' | 'senior' | 'lead';
+
+export interface ATSSkillCategories {
+  technical: string[];
+  soft: string[];
+  tools: string[];
+  domains: string[];
+}
+
+export interface ATSBreakdown {
+  formatting: number;
+  keywords: number;
+  experience: number;
+  education: number;
+  impact: number;
+}
+
+export interface ATSAnalysis {
+  skills: ATSSkillCategories;
+  atsScore: number;
+  atsBreakdown: ATSBreakdown;
+  suggestions: string[];
+  experience_level: ExperienceLevel;
+  summary: string;
+  analyzedAt?: string;
+}
+
+export type ATSCheckStatus = 'pass' | 'warning' | 'fail';
+
+export interface ATSCheckItem {
+  id: string;
+  label: string;
+  score: number;
+  status: ATSCheckStatus;
+  findings: string[];
+  recommendations: string[];
+}
+
+export type ATSReportGroupId = 'content' | 'skills' | 'format' | 'sections' | 'style';
+
+export interface ATSReportGroup {
+  id: ATSReportGroupId;
+  label: string;
+  score: number;
+  description: string;
+  checks: ATSCheckItem[];
+}
+
+export type ATSGrade = 'Needs Work' | 'Fair' | 'Good' | 'Strong';
+
+export interface ATSCheckerReport {
+  overallScore: number;
+  grade: ATSGrade;
+  scannedAt: string;
+  fileName: string;
+  executiveSummary: string;
+  topPriorities: string[];
+  experience_level: ExperienceLevel;
+  skills: ATSSkillCategories;
+  missingHardSkills: string[];
+  missingSoftSkills: string[];
+  groups: ATSReportGroup[];
+  jobDescriptionUsed: boolean;
+}
+
+export interface UserProfileData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  location: string;
+  headline: string;
+  avatar_url: string;
+  resume_url: string;
+  resume_filename: string;
+  resume_skills: string;
+  ats_score?: number;
+  ats_analysis?: ATSAnalysis | Record<string, unknown>;
+  updated_at: string;
+  created_at: string;
 }

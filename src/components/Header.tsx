@@ -45,6 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
   const getBreadcrumb = () => {
     switch (activeTab) {
       case 'home': return 'Dashboard Overview';
+      case 'profile': return 'My Profile & Resume';
+      case 'ats-checker': return 'AI ATS Resume Checker';
       case 'discovery': return 'Recruitment Discovery Engine';
       case 'inbox': return 'Inbox & AI Writing Assistant';
       case 'referrals': return 'Employee Referral Hub';
