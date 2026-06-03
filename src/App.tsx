@@ -63,10 +63,57 @@ export default function App() {
   return <DashboardLayout onSignOut={signOut} userEmail={user.email || ''} userName={user.user_metadata?.full_name || ''} userId={user.id} />;
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'jobsetu_sidebar_collapsed';
+
 function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut: () => Promise<void>; userEmail: string; userName: string; userId: string }) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleSetActiveTab = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    setSidebarMobileOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 1024) setSidebarMobileOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (sidebarMobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarMobileOpen]);
 
   // ─── Supabase real data ──────────────────────────────────
   const [realJobs, setRealJobs] = useState<DirectJob[]>([]);
@@ -158,7 +205,7 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
             userId={userId}
             totalJobs={realJobs.length}
             totalReferrals={realReferrals.length}
-            onNavigateToTab={(tab) => { setActiveTab(tab); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateToTab={handleSetActiveTab}
             searchQuery={searchQuery}
             realReferrals={realReferrals}
           />
@@ -206,17 +253,33 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
   return (
     <div className="min-h-screen bg-[#faf9f6] flex text-neutral-800">
       <Sidebar
-        activeTab={activeTab} setActiveTab={setActiveTab}
-        currentProfile={currentProfile} profiles={profiles}
+        activeTab={activeTab}
+        setActiveTab={handleSetActiveTab}
+        currentProfile={currentProfile}
+        profiles={profiles}
         onProfileChange={(newProf) => {
           setCurrentProfile(newProf);
-          setActiveTab('home');
+          handleSetActiveTab('home');
         }}
-        unreadCount={0} onSignOut={onSignOut} isAdmin={isAdmin}
+        unreadCount={0}
+        onSignOut={onSignOut}
+        isAdmin={isAdmin}
+        isMobileOpen={sidebarMobileOpen}
+        isCollapsed={sidebarCollapsed}
+        onMobileClose={() => setSidebarMobileOpen(false)}
+        onToggleCollapse={toggleSidebarCollapsed}
       />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header currentProfile={currentProfile} activeTab={activeTab} onSearch={(val) => setSearchQuery(val)} onSignOut={onSignOut} />
-        <main className="flex-1 overflow-y-auto px-8 py-8 max-w-7xl w-full mx-auto space-y-4">
+      <div className="flex-1 flex flex-col min-w-0 w-full lg:min-h-screen">
+        <Header
+          currentProfile={currentProfile}
+          activeTab={activeTab}
+          onSearch={(val) => setSearchQuery(val)}
+          onSignOut={onSignOut}
+          onOpenMobileMenu={() => setSidebarMobileOpen(true)}
+          onToggleSidebarCollapse={toggleSidebarCollapsed}
+          isSidebarCollapsed={sidebarCollapsed}
+        />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 max-w-7xl w-full mx-auto space-y-4">
           {renderActiveView()}
         </main>
       </div>

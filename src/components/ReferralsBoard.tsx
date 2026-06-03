@@ -189,7 +189,7 @@ export const ReferralsBoard: React.FC<ReferralsBoardProps> = ({
             return (
               <div 
                 key={stage.key} 
-                className="bg-[#faf9f6] border border-[#ecebe6]/80 rounded-xl p-4 flex flex-col h-[520px] overflow-hidden"
+                className="bg-[#faf9f6] border border-[#ecebe6]/80 rounded-xl p-4 flex flex-col min-h-[280px] h-[min(520px,70vh)] lg:h-[520px] overflow-hidden"
               >
                 {/* Stage Title Header */}
                 <div className="flex items-center justify-between pb-3.5 border-b border-[#ecebe6]/50 mb-4 shrink-0">

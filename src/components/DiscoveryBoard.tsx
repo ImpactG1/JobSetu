@@ -24,6 +24,7 @@ import { DirectJob, ReferralOpportunity, EmailTemplate, EmailAttachment, Experie
 import { useAuth } from '../context/AuthContext';
 import { sendGmailEmail } from '../lib/gmailService';
 import { trackEmailSent } from '../lib/emailTracker';
+import { isGoogleAuthError } from '../lib/googleAuth';
 import {
   computeJobMatchScore,
   computeReferralMatchScore,
@@ -83,7 +84,7 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
   resumeSkills = [],
   experienceLevel,
 }) => {
-  const { providerToken, refreshGoogleToken, isGmailConnected } = useAuth();
+  const { getValidGoogleAccessToken, isGmailConnected } = useAuth();
   // Tab state
   const [activeTab, setActiveTab] = useState<DiscoveryTab>('direct');
 
@@ -172,15 +173,21 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
         }))
       );
 
-      let token = providerToken;
-      if (!token) token = await refreshGoogleToken();
+      let token = await getValidGoogleAccessToken();
       if (!token) {
         setComposeResult({ success: false, message: 'Gmail not connected. Please sign in with Google first.' });
         setComposeSending(false);
         return;
       }
 
-      const result = await sendGmailEmail(token, composeJob.email, composeSubject, composeBody, userEmail, processedAttachments);
+      let result = await sendGmailEmail(token, composeJob.email, composeSubject, composeBody, userEmail, processedAttachments);
+
+      if (!result.success && result.error && isGoogleAuthError(result.error)) {
+        token = await getValidGoogleAccessToken({ forceRefresh: true });
+        if (token) {
+          result = await sendGmailEmail(token, composeJob.email, composeSubject, composeBody, userEmail, processedAttachments);
+        }
+      }
       if (result.success) {
         // Track in Supabase
         await trackEmailSent({
@@ -322,10 +329,10 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
   const filteredCount = activeTab === 'direct' ? filteredDirectJobs.length : filteredReferrals.length;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in duration-300">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8 animate-in fade-in duration-300">
 
       {/* ═══ Left Filter Panel ═══ */}
-      <div className="bg-white border border-[#ecebe6] rounded-xl elite-card-shadow p-6 space-y-5 h-fit sticky top-24">
+      <div className="bg-white border border-[#ecebe6] rounded-xl elite-card-shadow p-4 sm:p-6 space-y-5 h-fit lg:sticky lg:top-24 z-10">
         <div className="flex items-center justify-between pb-3 border-b border-[#faf9f6]">
           <div className="flex items-center space-x-2 text-neutral-800 font-bold text-sm">
             <Filter className="w-4 h-4" />
@@ -410,8 +417,8 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
       <div className="lg:col-span-3 space-y-6">
 
         {/* Category Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex bg-neutral-100 rounded-xl p-1 border border-neutral-200/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex bg-neutral-100 rounded-xl p-1 border border-neutral-200/50 w-full sm:w-auto overflow-x-auto">
             <button onClick={() => { setActiveTab('direct'); resetFilters(); }}
               className={`flex items-center space-x-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${activeTab === 'direct' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/60' : 'text-neutral-400 hover:text-neutral-600'}`}>
               <Briefcase className="w-3.5 h-3.5" />
@@ -425,16 +432,16 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
               <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'referral' ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-500'}`}>{realReferrals.length}</span>
             </button>
           </div>
-          <div className="flex items-center space-x-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-100/50 px-3 py-1.5 rounded-lg">
+          <div className="flex items-center space-x-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-100/50 px-3 py-1.5 rounded-lg shrink-0 self-start sm:self-auto">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-medium">Live from Database</span>
           </div>
         </div>
 
         {/* Results header */}
-        <div className="flex items-center justify-between pb-2 border-b border-[#ecebe6]">
-          <div>
-            <h2 className="font-serif-display text-xl font-bold text-neutral-900 uppercase">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#ecebe6]">
+          <div className="min-w-0">
+            <h2 className="font-serif-display text-lg sm:text-xl font-bold text-neutral-900 uppercase">
               {activeTab === 'direct' ? 'Direct Job Listings' : 'Referral Opportunities'}
             </h2>
             <p className="text-xs text-neutral-400 font-medium mt-0.5">
@@ -638,7 +645,7 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
       {/* ═══ Compose Email Modal ═══ */}
       {composeOpen && composeJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-neutral-200 max-w-2xl w-full elite-card-shadow overflow-hidden">
+          <div className="bg-white rounded-2xl border border-neutral-200 max-w-2xl w-full max-h-[90dvh] overflow-y-auto elite-card-shadow">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-5 border-b border-[#ecebe6] bg-neutral-50/40">
               <div className="space-y-1">
@@ -752,7 +759,7 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
               )}
 
               {/* Gmail not connected warning */}
-              {!isGmailConnected && !providerToken && (
+              {!isGmailConnected && (
                 <div className="flex items-center space-x-2 p-3 rounded-lg text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-100">
                   <AlertCircle className="w-3.5 h-3.5" />
                   <span>Gmail not connected. Sign in with Google to send emails.</span>

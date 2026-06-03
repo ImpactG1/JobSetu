@@ -262,9 +262,63 @@ app.post('/api/groq/resume-skills', async (req, res) => {
   return res.json({ skills: found, isMocked: true });
 });
 
+// ─── Google OAuth: refresh access token (keeps client_secret on server) ───
+
+app.post('/api/auth/google/refresh', async (req, res) => {
+  const refreshToken = req.body?.refresh_token;
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'refresh_token is required' });
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return res.status(503).json({
+      error: 'Google OAuth refresh is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server.',
+    });
+  }
+
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+
+    const data = await tokenRes.json().catch(() => ({}));
+
+    if (!tokenRes.ok) {
+      console.error('[Google] Token refresh failed:', data);
+      return res.status(tokenRes.status === 400 ? 401 : 502).json({
+        error: data.error_description || data.error || 'Failed to refresh Google token',
+      });
+    }
+
+    return res.json({
+      access_token: data.access_token,
+      expires_in: data.expires_in ?? 3600,
+      token_type: data.token_type,
+    });
+  } catch (err: unknown) {
+    console.error('[Google] Token refresh error:', err);
+    return res.status(500).json({ error: 'Internal error refreshing token' });
+  }
+});
+
 // Serve health status
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Elite HR Server', hasGroqKey: !!process.env.GROQ_API_KEY });
+  res.json({
+    status: 'ok',
+    service: 'Elite HR Server',
+    hasGroqKey: !!process.env.GROQ_API_KEY,
+    hasGoogleRefresh: !!(process.env.GOOGLE_CLIENT_SECRET && (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID)),
+  });
 });
 
 // Configure Vite or Static Asset delivery

@@ -1,48 +1,7 @@
 /**
- * Generate downloadable ATS report PDF via jsPDF (CDN).
+ * Generate downloadable ATS report PDF (bundled jsPDF — loaded on demand).
  */
 import type { ATSCheckerReport } from '../types';
-
-declare global {
-  interface Window {
-    jspdf?: { jsPDF: new (opts?: { unit?: string; format?: string }) => JsPDFInstance };
-  }
-}
-
-interface JsPDFInstance {
-  internal: { pageSize: { getWidth: () => number; getHeight: () => number } };
-  setFontSize(size: number): void;
-  setFont(font: string, style?: string): void;
-  setTextColor(r: number, g?: number, b?: number): void;
-  text(text: string, x: number, y: number, options?: { maxWidth?: number }): void;
-  addPage(): void;
-  line(x1: number, y1: number, x2: number, y2: number): void;
-  setDrawColor(r: number, g?: number, b?: number): void;
-  save(filename: string): void;
-}
-
-const JSPDF_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
-
-let loadPromise: Promise<void> | null = null;
-
-function loadJsPDF(): Promise<void> {
-  if (window.jspdf?.jsPDF) return Promise.resolve();
-  if (loadPromise) return loadPromise;
-
-  loadPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = JSPDF_CDN;
-    script.async = true;
-    script.onload = () => {
-      if (window.jspdf?.jsPDF) resolve();
-      else reject(new Error('jsPDF failed to load'));
-    };
-    script.onerror = () => reject(new Error('Failed to load jsPDF'));
-    document.head.appendChild(script);
-  });
-
-  return loadPromise;
-}
 
 function wrapText(text: string, maxChars: number): string[] {
   const words = text.split(/\s+/);
@@ -68,8 +27,8 @@ function statusLabel(score: number): string {
 }
 
 export async function downloadATSReportPdf(report: ATSCheckerReport): Promise<void> {
-  await loadJsPDF();
-  const doc = new window.jspdf!.jsPDF({ unit: 'pt', format: 'a4' });
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 48;
   const contentW = pageW - margin * 2;
@@ -84,10 +43,15 @@ export async function downloadATSReportPdf(report: ATSCheckerReport): Promise<vo
     }
   };
 
-  const printLines = (lines: string[], size: number, bold = false, color: [number, number, number] = [64, 64, 64]) => {
+  const printLines = (
+    lines: string[],
+    size: number,
+    bold = false,
+    color: [number, number, number] = [64, 64, 64]
+  ) => {
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
     doc.setFontSize(size);
-    doc.setTextColor(...color);
+    doc.setTextColor(color[0], color[1], color[2]);
     for (const line of lines) {
       ensureSpace(size + 4);
       doc.text(line, margin, y, { maxWidth: contentW });

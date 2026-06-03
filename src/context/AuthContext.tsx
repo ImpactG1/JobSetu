@@ -1,9 +1,17 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Session, User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { refreshGoogleAccessToken } from '../lib/googleAuth';
 
-// Google OAuth token refresh endpoint
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+const STORAGE_KEY_TOKEN = 'jobsetu_google_token';
+const STORAGE_KEY_REFRESH = 'jobsetu_google_refresh';
+const STORAGE_KEY_EXPIRES = 'jobsetu_google_expires';
+
+/** Refresh access token this many ms before expiry */
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+/** How often to check whether a proactive refresh is needed */
+const REFRESH_CHECK_INTERVAL_MS = 60 * 1000;
 
 interface AuthContextType {
   user: User | null;
@@ -14,11 +22,43 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
-  refreshGoogleToken: () => Promise<string | null>;
+  /** @deprecated Prefer getValidGoogleAccessToken */
+  refreshGoogleToken: (forceRefresh?: boolean) => Promise<string | null>;
+  getValidGoogleAccessToken: (options?: { forceRefresh?: boolean }) => Promise<string | null>;
   isGmailConnected: boolean;
+  gmailTokenRefreshing: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function readStoredTokens() {
+  return {
+    access: localStorage.getItem(STORAGE_KEY_TOKEN),
+    refresh: localStorage.getItem(STORAGE_KEY_REFRESH),
+    expiresAt: parseInt(localStorage.getItem(STORAGE_KEY_EXPIRES) || '0', 10),
+  };
+}
+
+function persistTokens(token: string | null, refresh: string | null, expiresAt: number) {
+  if (token) localStorage.setItem(STORAGE_KEY_TOKEN, token);
+  else localStorage.removeItem(STORAGE_KEY_TOKEN);
+  if (refresh) localStorage.setItem(STORAGE_KEY_REFRESH, refresh);
+  else localStorage.removeItem(STORAGE_KEY_REFRESH);
+  if (expiresAt) localStorage.setItem(STORAGE_KEY_EXPIRES, String(expiresAt));
+  else localStorage.removeItem(STORAGE_KEY_EXPIRES);
+}
+
+function applyProviderSession(session: Session | null) {
+  if (!session?.provider_token) return null;
+  const expiresAt = Date.now() + 3500 * 1000;
+  const refresh = session.provider_refresh_token || localStorage.getItem(STORAGE_KEY_REFRESH);
+  persistTokens(session.provider_token, refresh, expiresAt);
+  return {
+    access: session.provider_token,
+    refresh,
+    expiresAt,
+  };
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,148 +67,207 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [providerToken, setProviderToken] = useState<string | null>(null);
   const [providerRefreshToken, setProviderRefreshToken] = useState<string | null>(null);
   const [tokenExpiresAt, setTokenExpiresAt] = useState<number>(0);
+  const [gmailTokenRefreshing, setGmailTokenRefreshing] = useState(false);
 
-  // Persist tokens in localStorage for survival across page reloads
-  const STORAGE_KEY_TOKEN = 'jobsetu_google_token';
-  const STORAGE_KEY_REFRESH = 'jobsetu_google_refresh';
-  const STORAGE_KEY_EXPIRES = 'jobsetu_google_expires';
+  const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
 
-  // Load persisted tokens on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const savedRefresh = localStorage.getItem(STORAGE_KEY_REFRESH);
-    const savedExpires = localStorage.getItem(STORAGE_KEY_EXPIRES);
-    if (savedToken) setProviderToken(savedToken);
-    if (savedRefresh) setProviderRefreshToken(savedRefresh);
-    if (savedExpires) setTokenExpiresAt(parseInt(savedExpires, 10));
+  const syncFromStorage = useCallback(() => {
+    const stored = readStoredTokens();
+    setProviderToken(stored.access);
+    setProviderRefreshToken(stored.refresh);
+    setTokenExpiresAt(stored.expiresAt);
+    return stored;
   }, []);
 
-  // Save tokens to localStorage whenever they change
-  const persistTokens = (token: string | null, refresh: string | null, expires: number) => {
-    if (token) localStorage.setItem(STORAGE_KEY_TOKEN, token);
-    else localStorage.removeItem(STORAGE_KEY_TOKEN);
-    if (refresh) localStorage.setItem(STORAGE_KEY_REFRESH, refresh);
-    else localStorage.removeItem(STORAGE_KEY_REFRESH);
-    if (expires) localStorage.setItem(STORAGE_KEY_EXPIRES, String(expires));
-    else localStorage.removeItem(STORAGE_KEY_EXPIRES);
+  const saveTokens = useCallback((access: string, refresh: string | null, expiresAt: number) => {
+    const refreshToStore = refresh || localStorage.getItem(STORAGE_KEY_REFRESH);
+    persistTokens(access, refreshToStore, expiresAt);
+    setProviderToken(access);
+    if (refreshToStore) setProviderRefreshToken(refreshToStore);
+    setTokenExpiresAt(expiresAt);
+  }, []);
+
+  const clearGoogleTokens = useCallback(() => {
+    persistTokens(null, null, 0);
+    setProviderToken(null);
+    setProviderRefreshToken(null);
+    setTokenExpiresAt(0);
+  }, []);
+
+  const refreshViaClientOnly = async (refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+    if (!clientId) return null;
+
+    const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data.access_token) return null;
+    return { access_token: data.access_token, expires_in: data.expires_in ?? 3600 };
   };
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+  const performTokenRefresh = useCallback(async (): Promise<string | null> => {
+    const stored = readStoredTokens();
+    const refreshToken = stored.refresh || providerRefreshToken;
+    if (!refreshToken) {
+      console.warn('[Auth] No Google refresh token. User must sign in with Google again.');
+      return null;
+    }
 
-      // Extract provider tokens if available (only present right after OAuth login)
-      if (session?.provider_token) {
-        const expiresAt = Date.now() + 3500 * 1000; // ~58 min safety margin
-        setProviderToken(session.provider_token);
-        setProviderRefreshToken(session.provider_refresh_token || null);
-        setTokenExpiresAt(expiresAt);
-        persistTokens(session.provider_token, session.provider_refresh_token || null, expiresAt);
+    setGmailTokenRefreshing(true);
+    try {
+      let access_token: string;
+      let expires_in: number;
+
+      try {
+        const result = await refreshGoogleAccessToken(refreshToken);
+        access_token = result.access_token;
+        expires_in = result.expires_in;
+      } catch (serverErr) {
+        console.warn('[Auth] Server refresh failed, trying client-only:', serverErr);
+        const fallback = await refreshViaClientOnly(refreshToken);
+        if (!fallback) throw serverErr;
+        access_token = fallback.access_token;
+        expires_in = fallback.expires_in;
+      }
+
+      const newExpiresAt = Date.now() + (expires_in - 60) * 1000;
+      saveTokens(access_token, refreshToken, newExpiresAt);
+      return access_token;
+    } catch (err) {
+      console.error('[Auth] Token refresh failed:', err);
+      const storedAccess = readStoredTokens().access;
+      if (!storedAccess) {
+        setProviderToken(null);
+        setTokenExpiresAt(0);
+      }
+      return null;
+    } finally {
+      setGmailTokenRefreshing(false);
+    }
+  }, [providerRefreshToken, saveTokens]);
+
+  const refreshGoogleToken = useCallback(
+    async (forceRefresh = false): Promise<string | null> => {
+      const stored = readStoredTokens();
+
+      if (!forceRefresh && stored.access && Date.now() < stored.expiresAt - REFRESH_BUFFER_MS) {
+        setProviderToken(stored.access);
+        setTokenExpiresAt(stored.expiresAt);
+        return stored.access;
+      }
+
+      if (!stored.refresh && !providerRefreshToken) {
+        return stored.access && Date.now() < stored.expiresAt ? stored.access : null;
+      }
+
+      if (refreshInFlightRef.current) {
+        return refreshInFlightRef.current;
+      }
+
+      refreshInFlightRef.current = performTokenRefresh().finally(() => {
+        refreshInFlightRef.current = null;
+      });
+
+      return refreshInFlightRef.current;
+    },
+    [performTokenRefresh, providerRefreshToken]
+  );
+
+  const getValidGoogleAccessToken = useCallback(
+    async (options?: { forceRefresh?: boolean }): Promise<string | null> => {
+      return refreshGoogleToken(Boolean(options?.forceRefresh));
+    },
+    [refreshGoogleToken]
+  );
+
+  useEffect(() => {
+    syncFromStorage();
+
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+
+      const applied = applyProviderSession(initialSession);
+      if (applied) {
+        setProviderToken(applied.access);
+        setProviderRefreshToken(applied.refresh);
+        setTokenExpiresAt(applied.expiresAt);
       }
 
       setLoading(false);
     });
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
 
-        // Capture provider tokens on sign-in event
-        if (session?.provider_token) {
-          const expiresAt = Date.now() + 3500 * 1000;
-          setProviderToken(session.provider_token);
-          setProviderRefreshToken(session.provider_refresh_token || null);
-          setTokenExpiresAt(expiresAt);
-          persistTokens(session.provider_token, session.provider_refresh_token || null, expiresAt);
-        }
-
-        setLoading(false);
+      const applied = applyProviderSession(nextSession);
+      if (applied) {
+        setProviderToken(applied.access);
+        setProviderRefreshToken(applied.refresh);
+        setTokenExpiresAt(applied.expiresAt);
       }
-    );
 
-    return () => {
-      subscription.unsubscribe();
-    };
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // ─── Refresh Google Token ─────────────────────────────────
-  const refreshGoogleToken = useCallback(async (): Promise<string | null> => {
-    // If current token is still valid, return it
-    if (providerToken && Date.now() < tokenExpiresAt) {
-      return providerToken;
+  // Refresh expired token once after auth hydration
+  useEffect(() => {
+    if (loading) return;
+    const stored = readStoredTokens();
+    if (stored.refresh && Date.now() >= stored.expiresAt - REFRESH_BUFFER_MS) {
+      void refreshGoogleToken(true);
     }
+  }, [loading, refreshGoogleToken]);
 
-    // Try to refresh using the refresh token
-    if (!providerRefreshToken) {
-      console.warn('[Auth] No refresh token available. User needs to re-authenticate.');
-      return null;
-    }
-
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
-    if (!clientId) {
-      console.error('[Auth] VITE_GOOGLE_CLIENT_ID not set. Cannot refresh token.');
-      return null;
-    }
-
-    try {
-      const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: clientId,
-          grant_type: 'refresh_token',
-          refresh_token: providerRefreshToken,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[Auth] Token refresh failed:', errorData);
-        // Clear stale tokens
-        setProviderToken(null);
-        setTokenExpiresAt(0);
-        persistTokens(null, providerRefreshToken, 0);
-        return null;
+  // Proactive refresh while the app is open
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const stored = readStoredTokens();
+      if (!stored.refresh) return;
+      if (Date.now() >= stored.expiresAt - REFRESH_BUFFER_MS) {
+        refreshGoogleToken(true);
       }
+    }, REFRESH_CHECK_INTERVAL_MS);
 
-      const data = await response.json();
-      const newToken = data.access_token as string;
-      const expiresIn = (data.expires_in as number) || 3600;
-      const newExpiresAt = Date.now() + (expiresIn - 60) * 1000;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const stored = readStoredTokens();
+      if (stored.refresh && Date.now() >= stored.expiresAt - REFRESH_BUFFER_MS) {
+        refreshGoogleToken(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
-      setProviderToken(newToken);
-      setTokenExpiresAt(newExpiresAt);
-      persistTokens(newToken, providerRefreshToken, newExpiresAt);
-
-      return newToken;
-    } catch (err) {
-      console.error('[Auth] Token refresh error:', err);
-      return null;
-    }
-  }, [providerToken, providerRefreshToken, tokenExpiresAt]);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refreshGoogleToken]);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          full_name: fullName || '',
-        },
-      },
+      options: { data: { full_name: fullName || '' } },
     });
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
@@ -191,22 +290,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-    setProviderToken(null);
-    setProviderRefreshToken(null);
-    setTokenExpiresAt(0);
-    localStorage.removeItem(STORAGE_KEY_TOKEN);
-    localStorage.removeItem(STORAGE_KEY_REFRESH);
-    localStorage.removeItem(STORAGE_KEY_EXPIRES);
+    clearGoogleTokens();
   };
 
-  const isGmailConnected = !!providerToken && Date.now() < tokenExpiresAt;
+  const hasRefreshToken = !!providerRefreshToken || !!localStorage.getItem(STORAGE_KEY_REFRESH);
+  const hasValidAccess =
+    !!providerToken && tokenExpiresAt > 0 && Date.now() < tokenExpiresAt;
+  const isGmailConnected = hasRefreshToken || hasValidAccess;
 
   return (
-    <AuthContext.Provider value={{
-      user, session, loading, providerToken,
-      signUp, signIn, signInWithGoogle, signOut,
-      refreshGoogleToken, isGmailConnected
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        providerToken,
+        signUp,
+        signIn,
+        signInWithGoogle,
+        signOut,
+        refreshGoogleToken,
+        getValidGoogleAccessToken,
+        isGmailConnected,
+        gmailTokenRefreshing,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

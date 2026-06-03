@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Mail, Send, Star, Sparkles, Clock, AlertCircle,
   Check, CornerUpLeft, Loader2, RefreshCw, Inbox,
-  ArrowRight, LogIn, Search, X
+  ArrowRight, LogIn, Search, X, ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchGmailInbox, fetchGmailSent } from '../lib/gmailService';
+import { isGoogleAuthError } from '../lib/googleAuth';
 import type { GmailMessage } from '../types';
 
 interface InboxBoardProps {
@@ -13,7 +14,7 @@ interface InboxBoardProps {
 }
 
 export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
-  const { providerToken, refreshGoogleToken, isGmailConnected, signInWithGoogle } = useAuth();
+  const { getValidGoogleAccessToken, isGmailConnected, signInWithGoogle, gmailTokenRefreshing } = useAuth();
 
   const [messages, setMessages] = useState<GmailMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -21,19 +22,16 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
   const [error, setError] = useState<string>('');
   const [filter, setFilter] = useState<'inbox' | 'sent'>('inbox');
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
 
   // ─── Fetch Gmail Messages ─────────────────────────────────
 
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (isRetry = false) => {
     setLoading(true);
     setError('');
 
     try {
-      let token = providerToken;
-      // Try refresh if token might be expired
-      if (!token) {
-        token = await refreshGoogleToken();
-      }
+      const token = await getValidGoogleAccessToken({ forceRefresh: isRetry });
       if (!token) {
         setError('Gmail not connected. Please sign in with Google to access your inbox.');
         setLoading(false);
@@ -45,38 +43,39 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
         : await fetchGmailSent(token, 20);
 
       setMessages(msgs);
-      if (msgs.length > 0 && !selectedId) {
-        setSelectedId(msgs[0].id);
+      if (msgs.length > 0) {
+        setSelectedId(prev => prev || msgs[0].id);
       }
-    } catch (err: any) {
-      if (err.message?.includes('401') || err.message?.includes('Invalid Credentials')) {
-        // Token expired, try refresh
-        const newToken = await refreshGoogleToken();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load messages';
+      if (!isRetry && isGoogleAuthError(message)) {
+        const newToken = await getValidGoogleAccessToken({ forceRefresh: true });
         if (newToken) {
-          loadMessages(); // Retry
+          await loadMessages(true);
           return;
         }
         setError('Gmail session expired. Please sign in with Google again.');
       } else {
-        setError(err.message || 'Failed to load messages');
+        setError(message);
       }
     } finally {
       setLoading(false);
     }
-  }, [providerToken, filter, searchQuery, refreshGoogleToken, selectedId]);
+  }, [filter, searchQuery, getValidGoogleAccessToken]);
 
   useEffect(() => {
-    if (isGmailConnected || providerToken) {
+    if (isGmailConnected) {
       loadMessages();
     }
-  }, [filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when inbox/sent filter changes
+  }, [filter, isGmailConnected]);
 
-  // Load on first mount if connected
   useEffect(() => {
-    if (isGmailConnected || providerToken) {
+    if (isGmailConnected) {
       loadMessages();
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load when Gmail becomes available
+  }, [isGmailConnected]);
 
   const selectedMessage = messages.find(m => m.id === selectedId);
 
@@ -105,10 +104,10 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
 
   // ─── Not Connected State ──────────────────────────────────
 
-  if (!isGmailConnected && !providerToken) {
+  if (!isGmailConnected) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-180px)] animate-in fade-in duration-300">
-        <div className="bg-white border border-[#ecebe6] rounded-2xl elite-card-shadow p-10 max-w-md text-center space-y-5">
+      <div className="flex items-center justify-center min-h-[50vh] py-8 animate-in fade-in duration-300">
+        <div className="bg-white border border-[#ecebe6] rounded-2xl elite-card-shadow p-6 sm:p-10 max-w-md w-full mx-4 text-center space-y-5">
           <div className="w-16 h-16 rounded-2xl bg-neutral-100 flex items-center justify-center mx-auto">
             <Mail className="w-8 h-8 text-neutral-400" />
           </div>
@@ -134,23 +133,27 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] animate-in fade-in duration-300">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 min-h-[min(70vh,600px)] lg:min-h-[calc(100dvh-11rem)] animate-in fade-in duration-300">
 
       {/* ═══ Left: Message List ═══ */}
-      <div className="lg:col-span-4 bg-white border border-[#ecebe6] rounded-xl elite-card-shadow flex flex-col h-full overflow-hidden">
+      <div
+        className={`lg:col-span-4 bg-white border border-[#ecebe6] rounded-xl elite-card-shadow flex flex-col min-h-[280px] lg:min-h-0 lg:h-full overflow-hidden ${
+          mobileShowDetail ? 'hidden lg:flex' : 'flex'
+        }`}
+      >
         {/* Header */}
         <div className="p-4 border-b border-[#faf9f6] flex items-center justify-between shrink-0 bg-neutral-50/40">
           <div className="flex bg-[#ecebe6]/50 rounded-lg p-0.5 space-x-1">
             {(['inbox', 'sent'] as const).map(f => (
-              <button key={f} onClick={() => { setFilter(f); setSelectedId(''); }}
+              <button key={f} onClick={() => { setFilter(f); setSelectedId(''); setMobileShowDetail(false); }}
                 className={`text-[10px] uppercase font-bold tracking-wider px-3 py-1 rounded transition-all ${filter === f ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-500 hover:text-neutral-800'}`}>
                 {f}
               </button>
             ))}
           </div>
-          <button onClick={loadMessages} disabled={loading}
+          <button onClick={() => loadMessages()} disabled={loading || gmailTokenRefreshing}
             className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors" title="Refresh">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading || gmailTokenRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
@@ -179,7 +182,7 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
               const isStarred = starredIds.has(msg.id);
               return (
                 <div key={msg.id}
-                  onClick={() => setSelectedId(msg.id)}
+                  onClick={() => { setSelectedId(msg.id); setMobileShowDetail(true); }}
                   className={`p-4 cursor-pointer hover:bg-neutral-50/50 transition-all flex items-start gap-3 relative ${isSelected ? 'bg-neutral-50 border-r-2 border-neutral-900' : ''} ${!msg.isRead ? 'bg-blue-50/30' : ''}`}>
                   <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600 font-bold text-xs shrink-0">
                     {msg.fromName.charAt(0).toUpperCase()}
@@ -206,12 +209,24 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
       </div>
 
       {/* ═══ Right: Message Detail ═══ */}
-      <div className="lg:col-span-8 flex flex-col h-full bg-white border border-[#ecebe6] rounded-xl elite-card-shadow overflow-hidden">
+      <div
+        className={`lg:col-span-8 flex flex-col min-h-[320px] lg:min-h-0 lg:h-full bg-white border border-[#ecebe6] rounded-xl elite-card-shadow overflow-hidden ${
+          mobileShowDetail ? 'flex' : 'hidden lg:flex'
+        }`}
+      >
         {selectedMessage ? (
           <>
             {/* Header */}
             <div className="p-4 border-b border-[#ecebe6] shrink-0 bg-neutral-50/20">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileShowDetail(false)}
+                  className="lg:hidden p-1.5 -ml-1 rounded-lg hover:bg-neutral-100 text-neutral-600 shrink-0"
+                  aria-label="Back to messages"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
                 <div className="space-y-1 min-w-0 flex-1">
                   <h3 className="font-serif-display text-base font-bold text-neutral-900 leading-snug">{selectedMessage.subject}</h3>
                   <div className="flex items-center space-x-2 text-xs text-neutral-500">
@@ -225,8 +240,8 @@ export const InboxBoard: React.FC<InboxBoardProps> = ({ searchQuery }) => {
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 bg-zinc-50/20">
-              <div className="max-w-2xl bg-white border border-[#ecebe6] rounded-xl p-5 elite-card-shadow">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-zinc-50/20">
+              <div className="max-w-2xl w-full bg-white border border-[#ecebe6] rounded-xl p-4 sm:p-5 elite-card-shadow">
                 <pre className="text-xs text-neutral-700 whitespace-pre-wrap font-sans leading-relaxed">
                   {selectedMessage.body}
                 </pre>

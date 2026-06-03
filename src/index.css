@@ -61,3 +61,11 @@ body {
   background: #d4d4d8;
 }
 
+/* Safe area for mobile notches */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
