@@ -10,7 +10,8 @@
 /* Base style resets and customizations */
 body {
   font-family: var(--font-sans);
-  background-color: #faf9f6; /* Custom luxury warm off-white */
+  background-color: #faf9f6;
+  /* Custom luxury warm off-white */
   color: #1a1a1a;
   -webkit-font-smoothing: antialiased;
 }
@@ -68,4 +69,3 @@ body {
     padding-right: env(safe-area-inset-right);
   }
 }
-

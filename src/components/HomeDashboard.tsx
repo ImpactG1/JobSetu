@@ -112,7 +112,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-[#faf9f6]">
             <div>
               <h3 className="font-serif-display text-lg font-bold text-neutral-900">Recent Email Activity</h3>
-              <p className="text-xs text-neutral-400 font-medium">Emails sent through JobSetu platform</p>
+              <p className="text-xs text-neutral-400 font-medium">Emails sent through Reflyt platform</p>
             </div>
             <button onClick={() => onNavigateToTab('analytics')}
               className="text-xs text-neutral-600 hover:text-black font-semibold flex items-center gap-1 hover:underline">

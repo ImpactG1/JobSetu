@@ -10,8 +10,11 @@ import { SettingsBoard } from './components/SettingsBoard';
 import { ProfileBoard } from './components/ProfileBoard';
 import { ATSCheckerBoard } from './components/ATSCheckerBoard';
 import { AdminPanel } from './components/AdminPanel';
+import { PricingBoard } from './components/PricingBoard';
 import { AuthPage } from './components/AuthPage';
+import { LandingPage } from './components/LandingPage';
 import { useAuth } from './context/AuthContext';
+import { SubscriptionProvider } from './context/SubscriptionContext';
 import { checkIsAdmin } from './lib/adminConfig';
 import { fetchDirectJobs, fetchReferralOpportunities } from './lib/supabaseData';
 import { fetchUserProfile } from './lib/profileService';
@@ -25,8 +28,11 @@ import {
   EMAIL_TEMPLATES 
 } from './data';
 
+type PublicPage = 'landing' | 'auth' | 'ats';
+
 export default function App() {
   const { user, loading, signOut } = useAuth();
+  const [publicPage, setPublicPage] = useState<PublicPage>('landing');
 
   // --- Auth Gate ---
   if (loading) {
@@ -34,12 +40,12 @@ export default function App() {
       <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center">
         <div className="flex flex-col items-center space-y-6">
           <div className="relative">
-            <div className="w-16 h-16 rounded-2xl bg-neutral-900 flex items-center justify-center font-serif text-white text-2xl font-bold shadow-lg">E</div>
+            <div className="w-16 h-16 rounded-2xl bg-neutral-900 flex items-center justify-center font-serif text-white text-2xl font-bold shadow-lg">R</div>
             <div className="absolute inset-0 w-16 h-16 rounded-2xl border-2 border-neutral-200 animate-ping opacity-30" />
           </div>
           <div className="space-y-2 text-center">
-            <h3 className="font-serif text-lg font-bold text-neutral-900 tracking-tight">Elite HR</h3>
-            <p className="text-xs text-neutral-400 font-medium">Initializing executive portal...</p>
+            <h3 className="font-serif text-lg font-bold text-neutral-900 tracking-tight">Reflyt</h3>
+            <p className="text-xs text-neutral-400 font-medium">Initializing your career portal...</p>
           </div>
           <div className="w-48 h-0.5 bg-neutral-200 rounded-full overflow-hidden">
             <div className="h-full w-1/2 bg-neutral-900 rounded-full" style={{ animation: 'loading-slide 1.5s ease-in-out infinite' }} />
@@ -57,13 +63,50 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthPage />;
+    if (publicPage === 'auth') {
+      return <AuthPage onBack={() => setPublicPage('landing')} />;
+    }
+    if (publicPage === 'ats') {
+      return (
+        <div className="min-h-screen bg-[#faf9f6]">
+          {/* Minimal header for standalone ATS page */}
+          <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#ecebe6]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
+              <button onClick={() => setPublicPage('landing')} className="flex items-center space-x-2 group">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 flex items-center justify-center font-serif text-white text-sm font-bold">R</div>
+                <span className="font-serif text-base font-bold text-neutral-900 tracking-tight group-hover:text-neutral-600 transition-colors">Reflyt</span>
+              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setPublicPage('auth')} className="text-xs font-bold text-neutral-600 hover:text-neutral-900 px-3 py-1.5 transition-colors">Sign In</button>
+                <button onClick={() => setPublicPage('auth')} className="text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2 rounded-lg transition-all elite-button">Join Free</button>
+              </div>
+            </div>
+          </header>
+          <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+            <ATSCheckerBoard />
+          </main>
+          <footer className="border-t border-[#ecebe6] py-6 text-center text-[10px] text-neutral-400">
+            © {new Date().getFullYear()} Reflyt. Free ATS checker — no signup required.
+          </footer>
+        </div>
+      );
+    }
+    return (
+      <LandingPage
+        onNavigateAuth={() => setPublicPage('auth')}
+        onNavigateATS={() => setPublicPage('ats')}
+      />
+    );
   }
 
-  return <DashboardLayout onSignOut={signOut} userEmail={user.email || ''} userName={user.user_metadata?.full_name || ''} userId={user.id} />;
+  return (
+    <SubscriptionProvider userId={user.id}>
+      <DashboardLayout onSignOut={signOut} userEmail={user.email || ''} userName={user.user_metadata?.full_name || ''} userId={user.id} />
+    </SubscriptionProvider>
+  );
 }
 
-const SIDEBAR_COLLAPSED_KEY = 'jobsetu_sidebar_collapsed';
+const SIDEBAR_COLLAPSED_KEY = 'reflyt_sidebar_collapsed';
 
 function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut: () => Promise<void>; userEmail: string; userName: string; userId: string }) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
@@ -233,6 +276,7 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
             userName={userName || currentProfile.name}
             resumeSkills={resumeSkills}
             experienceLevel={experienceLevel}
+            onNavigatePricing={() => handleSetActiveTab('pricing')}
           />
         );
       case 'inbox':
@@ -245,6 +289,8 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
         return <SettingsBoard currentProfile={currentProfile} profiles={profiles} onUpdateProfile={handleUpdateProfile} templates={templates} onUpdateTemplate={handleUpdateTemplate} />;
       case 'admin':
         return isAdmin ? <AdminPanel /> : <div className="p-8 bg-white border border-[#ecebe6] rounded-xl text-center text-xs text-neutral-400">Access denied.</div>;
+      case 'pricing':
+        return <PricingBoard />;
       default:
         return <div className="p-8 bg-white border border-[#ecebe6] rounded-xl text-center text-xs text-neutral-400 font-light">View nodes under maintenance.</div>;
     }

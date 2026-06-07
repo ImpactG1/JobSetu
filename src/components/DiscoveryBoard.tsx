@@ -18,10 +18,13 @@ import {
   Check,
   Loader2,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Crown
 } from 'lucide-react';
 import { DirectJob, ReferralOpportunity, EmailTemplate, EmailAttachment, ExperienceLevel } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { sendGmailEmail } from '../lib/gmailService';
 import { trackEmailSent } from '../lib/emailTracker';
 import { isGoogleAuthError } from '../lib/googleAuth';
@@ -30,6 +33,7 @@ import {
   computeReferralMatchScore,
   getMatchScoreColor,
 } from '../lib/resumeMatcher';
+import { UpgradeModal } from './UpgradeModal';
 
 type DiscoveryTab = 'direct' | 'referral';
 
@@ -43,6 +47,7 @@ interface DiscoveryBoardProps {
   userName: string;
   resumeSkills?: string[];
   experienceLevel?: ExperienceLevel;
+  onNavigatePricing?: () => void;
 }
 
 const MatchScoreBadge = ({ score, show }: { score: number; show: boolean }) => {
@@ -83,8 +88,11 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
   userName,
   resumeSkills = [],
   experienceLevel,
+  onNavigatePricing,
 }) => {
   const { getValidGoogleAccessToken, isGmailConnected } = useAuth();
+  const { plan, checkDirectJob, checkReferral, applyDirectJob, clickReferral } = useSubscription();
+
   // Tab state
   const [activeTab, setActiveTab] = useState<DiscoveryTab>('direct');
 
@@ -99,6 +107,12 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
   // Pagination
   const [visibleCount, setVisibleCount] = useState(12);
   const [sortByMatch, setSortByMatch] = useState(false);
+
+  // Upgrade modal state
+  const [upgradeModal, setUpgradeModal] = useState<{ open: boolean; type: 'direct' | 'referral'; used: number; limit: number }>({ open: false, type: 'direct', used: 0, limit: 0 });
+
+  const directCheck = checkDirectJob();
+  const referralCheck = checkReferral();
 
   const hasResumeAnalysis = resumeSkills.length > 0;
 
@@ -551,20 +565,42 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
                 )}
 
                 {/* Actions */}
-                <div className="pt-3 border-t border-neutral-100 flex items-center justify-end space-x-2">
+                <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+                  {plan !== 'premium' && (
+                    <span className="text-[9px] font-medium text-neutral-400">
+                      {directCheck.limit === Infinity ? '' : `${directCheck.remaining} applies left`}
+                    </span>
+                  )}
+                  <div className="flex items-center space-x-2 ml-auto">
                   {job.email && (
-                    <button onClick={() => openCompose(job)} className="px-3 py-1.5 border border-neutral-200 hover:border-neutral-300 text-[11px] font-bold uppercase rounded-lg text-neutral-600 hover:text-neutral-800 transition-colors flex items-center space-x-1.5">
+                    <button onClick={async () => {
+                      const check = checkDirectJob();
+                      if (!check.allowed) {
+                        setUpgradeModal({ open: true, type: 'direct', used: check.used, limit: check.limit });
+                        return;
+                      }
+                      openCompose(job);
+                    }} className="px-3 py-1.5 border border-neutral-200 hover:border-neutral-300 text-[11px] font-bold uppercase rounded-lg text-neutral-600 hover:text-neutral-800 transition-colors flex items-center space-x-1.5">
                       <Mail className="w-3 h-3" /><span>Email HR</span>
                     </button>
                   )}
                   {job.application_link && (
-                    <a href={job.application_link} target="_blank" rel="noopener noreferrer" className="px-3.5 py-1.5 bg-neutral-900 text-white hover:bg-neutral-800 text-[11px] font-bold uppercase rounded-lg shadow-sm transition-all flex items-center space-x-1.5">
+                    <button onClick={async () => {
+                      const check = checkDirectJob();
+                      if (!check.allowed) {
+                        setUpgradeModal({ open: true, type: 'direct', used: check.used, limit: check.limit });
+                        return;
+                      }
+                      await applyDirectJob(job.id, job.company, job.job_title, 'link');
+                      window.open(job.application_link, '_blank', 'noopener,noreferrer');
+                    }} className="px-3.5 py-1.5 bg-neutral-900 text-white hover:bg-neutral-800 text-[11px] font-bold uppercase rounded-lg shadow-sm transition-all flex items-center space-x-1.5">
                       <ExternalLink className="w-3 h-3" /><span>Apply</span>
-                    </a>
+                    </button>
                   )}
                   {!job.email && !job.application_link && (
                     <span className="text-[10px] text-neutral-400 italic">No direct apply method</span>
                   )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -613,20 +649,45 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
                 )}
 
                 {/* Actions */}
-                <div className="pt-3 border-t border-neutral-100 flex items-center justify-end space-x-2">
+                <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+                  {plan === 'free' && (
+                    <span className="text-[9px] font-bold text-amber-600 flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Upgrade to apply
+                    </span>
+                  )}
+                  {plan !== 'free' && plan !== 'premium' && (
+                    <span className="text-[9px] font-medium text-neutral-400">
+                      {referralCheck.limit === Infinity ? '' : `${referralCheck.remaining} referrals left`}
+                    </span>
+                  )}
+                  <div className="flex items-center space-x-2 ml-auto">
                   {ref.career_page_link && (
                     <a href={ref.career_page_link} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 border border-neutral-200 hover:border-neutral-300 text-[11px] font-bold uppercase rounded-lg text-neutral-600 hover:text-neutral-800 transition-colors flex items-center space-x-1.5">
                       <Building2 className="w-3 h-3" /><span>Careers</span>
                     </a>
                   )}
                   {ref.referral_form_link && (
-                    <a href={ref.referral_form_link} target="_blank" rel="noopener noreferrer" className="px-3.5 py-1.5 bg-blue-700 text-white hover:bg-blue-600 text-[11px] font-bold uppercase rounded-lg shadow-sm transition-all flex items-center space-x-1.5">
-                      <Users className="w-3 h-3" /><span>Get Referred</span>
-                    </a>
+                    <button onClick={async () => {
+                      const check = checkReferral();
+                      if (!check.allowed) {
+                        setUpgradeModal({ open: true, type: 'referral', used: check.used, limit: check.limit });
+                        return;
+                      }
+                      await clickReferral(ref.id, ref.company, ref.job_titles, ref.referral_form_link);
+                      window.open(ref.referral_form_link, '_blank', 'noopener,noreferrer');
+                    }} className={`px-3.5 py-1.5 text-[11px] font-bold uppercase rounded-lg shadow-sm transition-all flex items-center space-x-1.5 ${
+                      plan === 'free'
+                        ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                        : 'bg-blue-700 text-white hover:bg-blue-600'
+                    }`}>
+                      {plan === 'free' ? <Lock className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                      <span>{plan === 'free' ? 'Locked' : 'Get Referred'}</span>
+                    </button>
                   )}
                   {!ref.referral_form_link && !ref.career_page_link && (
                     <span className="text-[10px] text-neutral-400 italic">Check source for details</span>
                   )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -780,6 +841,16 @@ export const DiscoveryBoard: React.FC<DiscoveryBoardProps> = ({
           </div>
         </div>
       )}
+
+      {/* ═══ Upgrade Modal ═══ */}
+      <UpgradeModal
+        isOpen={upgradeModal.open}
+        onClose={() => setUpgradeModal(prev => ({ ...prev, open: false }))}
+        onNavigatePricing={() => onNavigatePricing?.()}
+        limitType={upgradeModal.type}
+        used={upgradeModal.used}
+        limit={upgradeModal.limit}
+      />
     </div>
   );
 };

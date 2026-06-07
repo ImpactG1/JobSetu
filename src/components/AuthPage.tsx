@@ -17,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 
 type AuthMode = 'login' | 'signup';
 
-export const AuthPage: React.FC = () => {
+export const AuthPage: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -161,14 +161,14 @@ export const AuthPage: React.FC = () => {
           {/* Top brand */}
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center font-serif text-white text-lg font-bold">
-              E
+              R
             </div>
             <div>
               <h1 className="font-serif text-xl font-bold text-white tracking-tight leading-none">
-                Elite HR
+                Reflyt
               </h1>
               <p className="text-[10px] tracking-[0.25em] text-neutral-500 font-medium uppercase">
-                Executive Portal
+                Career Portal
               </p>
             </div>
           </div>
@@ -240,14 +240,14 @@ export const AuthPage: React.FC = () => {
           {/* Mobile brand (hidden on desktop) */}
           <div className="lg:hidden flex items-center justify-center space-x-2.5 mb-4">
             <div className="w-9 h-9 rounded-lg bg-neutral-900 flex items-center justify-center font-serif text-white text-base font-bold">
-              E
+              R
             </div>
             <div>
               <h1 className="font-serif text-lg font-bold text-neutral-900 tracking-tight leading-none">
-                Elite HR
+                Reflyt
               </h1>
               <p className="text-[9px] tracking-[0.25em] text-neutral-400 font-medium uppercase">
-                Executive Portal
+                Career Portal
               </p>
             </div>
           </div>
@@ -482,7 +482,7 @@ export const AuthPage: React.FC = () => {
             </div>
             <div className="relative flex justify-center text-[10px]">
               <span className="bg-[#faf9f6] px-4 text-neutral-400 font-medium uppercase tracking-wider">
-                {mode === 'login' ? 'New to Elite HR?' : 'Already have an account?'}
+                {mode === 'login' ? 'New to Reflyt?' : 'Already have an account?'}
               </span>
             </div>
           </div>

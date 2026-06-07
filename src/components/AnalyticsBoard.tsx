@@ -167,7 +167,7 @@ export const AnalyticsBoard: React.FC<AnalyticsBoardProps> = ({ userId, totalJob
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-serif-display text-base font-bold text-neutral-900 uppercase">Email Activity Log</h3>
-            <p className="text-xs text-neutral-400 font-medium">Your recent emails sent through JobSetu</p>
+            <p className="text-xs text-neutral-400 font-medium">Your recent emails sent through Reflyt</p>
           </div>
           <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full">{activities.length} total</span>
         </div>

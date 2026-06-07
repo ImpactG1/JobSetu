@@ -4,9 +4,9 @@ import { supabase } from '../lib/supabaseClient';
 import { refreshGoogleAccessToken } from '../lib/googleAuth';
 
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
-const STORAGE_KEY_TOKEN = 'jobsetu_google_token';
-const STORAGE_KEY_REFRESH = 'jobsetu_google_refresh';
-const STORAGE_KEY_EXPIRES = 'jobsetu_google_expires';
+const STORAGE_KEY_TOKEN = 'reflyt_google_token';
+const STORAGE_KEY_REFRESH = 'reflyt_google_refresh';
+const STORAGE_KEY_EXPIRES = 'reflyt_google_expires';
 
 /** Refresh access token this many ms before expiry */
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;

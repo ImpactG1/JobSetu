@@ -59,7 +59,7 @@ export async function downloadATSReportPdf(report: ATSCheckerReport): Promise<vo
     }
   };
 
-  printLines(['Elite HR — ATS Resume Report'], 20, true, [23, 23, 23]);
+  printLines(['Reflyt — ATS Resume Report'], 20, true, [23, 23, 23]);
   y += 4;
   printLines(
     [`File: ${report.fileName}`, `Scanned: ${new Date(report.scannedAt).toLocaleString()}`],
@@ -112,7 +112,7 @@ export async function downloadATSReportPdf(report: ATSCheckerReport): Promise<vo
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
   doc.text(
-    'AI suggestions may contain errors. Review before applying. Elite HR ATS Checker.',
+    'AI suggestions may contain errors. Review before applying. Reflyt ATS Checker.',
     margin,
     doc.internal.pageSize.getHeight() - 28,
     { maxWidth: contentW }

@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
@@ -311,6 +311,187 @@ app.post('/api/auth/google/refresh', async (req, res) => {
   }
 });
 
+// ─── Razorpay Integration ─────────────────────────────────────
+
+const RAZORPAY_KEY_ID = (process.env.RAZORPAY_KEY_ID || '').trim().replace(/^["']|["']$/g, '');
+const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || '').trim().replace(/^["']|["']$/g, '');
+
+// Startup debug — verify keys loaded correctly (masked)
+console.log(`[Razorpay Config] KEY_ID: ${RAZORPAY_KEY_ID ? RAZORPAY_KEY_ID.slice(0, 12) + '...' + RAZORPAY_KEY_ID.slice(-4) : 'NOT SET'} (${RAZORPAY_KEY_ID.length} chars)`);
+console.log(`[Razorpay Config] KEY_SECRET: ${RAZORPAY_KEY_SECRET ? RAZORPAY_KEY_SECRET.slice(0, 4) + '****' + RAZORPAY_KEY_SECRET.slice(-4) : 'NOT SET'} (${RAZORPAY_KEY_SECRET.length} chars)`);
+
+// Plan IDs — create these in Razorpay Dashboard > Subscriptions > Plans
+const RAZORPAY_PLANS: Record<string, string> = {
+  basic_monthly: (process.env.RAZORPAY_PLAN_ID_BASIC_MONTHLY || '').trim(),
+  basic_yearly: (process.env.RAZORPAY_PLAN_ID_BASIC_YEARLY || '').trim(),
+  premium_monthly: (process.env.RAZORPAY_PLAN_ID_PREMIUM_MONTHLY || '').trim(),
+  premium_yearly: (process.env.RAZORPAY_PLAN_ID_PREMIUM_YEARLY || '').trim(),
+};
+
+console.log(`[Razorpay Config] Plans loaded:`, Object.entries(RAZORPAY_PLANS).map(([k, v]) => `${k}=${v ? v.slice(0, 10) + '...' : 'NOT SET'}`).join(', '));
+
+// Create a Razorpay subscription
+app.post('/api/razorpay/create-subscription', async (req, res) => {
+  const { plan_id, email } = req.body;
+
+  if (!plan_id || typeof plan_id !== 'string') {
+    return res.status(400).json({ error: 'plan_id is required (e.g., basic_monthly)' });
+  }
+
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+    return res.status(503).json({
+      error: 'Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env',
+    });
+  }
+
+  const razorpayPlanId = RAZORPAY_PLANS[plan_id];
+  if (!razorpayPlanId) {
+    return res.status(400).json({
+      error: `No Razorpay plan found for "${plan_id}". Configure RAZORPAY_PLAN_ID_* in .env`,
+      available_keys: Object.keys(RAZORPAY_PLANS),
+    });
+  }
+
+  try {
+    const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+
+    const response = await fetch('https://api.razorpay.com/v1/subscriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        plan_id: razorpayPlanId,
+        total_count: 12, // max billing cycles (12 months or 12 years)
+        quantity: 1,
+        notes: {
+          email: email || '',
+          plan: plan_id,
+        },
+      }),
+    });
+
+    const responseText = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.error('[Razorpay] Non-JSON response:', responseText.slice(0, 500));
+      return res.status(502).json({ error: 'Invalid response from Razorpay API' });
+    }
+
+    if (!response.ok) {
+      console.error('[Razorpay] Create subscription failed:', data);
+      return res.status(response.status).json({
+        error: data.error?.description || data.error?.code || 'Failed to create Razorpay subscription',
+        details: data.error || null,
+      });
+    }
+
+    console.log('[Razorpay] Subscription created:', data.id);
+    return res.json({ subscription_id: data.id, status: data.status });
+  } catch (err: any) {
+    console.error('[Razorpay] Create subscription error:', err.message);
+    return res.status(500).json({ error: `Internal error: ${err.message}` });
+  }
+});
+
+// Verify Razorpay payment signature
+app.post('/api/razorpay/verify-payment', async (req, res) => {
+  const {
+    razorpay_payment_id,
+    razorpay_subscription_id,
+    razorpay_signature,
+    plan,
+    billing_cycle,
+    user_id,
+  } = req.body;
+
+  if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+    return res.status(400).json({ error: 'Missing payment verification fields' });
+  }
+
+  if (!RAZORPAY_KEY_SECRET) {
+    return res.status(503).json({ error: 'Razorpay key secret not configured' });
+  }
+
+  try {
+    // Verify signature: HMAC SHA256 of "payment_id|subscription_id"
+    const payload = `${razorpay_payment_id}|${razorpay_subscription_id}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(payload)
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      console.error('[Razorpay] Signature mismatch:', { expected: expectedSignature, got: razorpay_signature });
+      return res.status(400).json({ error: 'Payment verification failed — signature mismatch' });
+    }
+
+    console.log(`[Razorpay] Payment verified: ${razorpay_payment_id} for user ${user_id}, plan=${plan}, cycle=${billing_cycle}`);
+
+    return res.json({
+      verified: true,
+      payment_id: razorpay_payment_id,
+      subscription_id: razorpay_subscription_id,
+    });
+  } catch (err: any) {
+    console.error('[Razorpay] Verify error:', err);
+    return res.status(500).json({ error: 'Internal error verifying payment' });
+  }
+});
+
+// Razorpay Webhook (for subscription lifecycle events)
+app.post('/api/razorpay/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  if (!RAZORPAY_KEY_SECRET) {
+    return res.status(503).json({ error: 'Razorpay not configured' });
+  }
+
+  try {
+    const webhookSignature = req.headers['x-razorpay-signature'] as string;
+    const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+
+    const expectedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest('hex');
+
+    if (expectedSignature !== webhookSignature) {
+      console.error('[Razorpay Webhook] Signature mismatch');
+      return res.status(400).json({ error: 'Invalid webhook signature' });
+    }
+
+    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const eventType = event?.event;
+
+    console.log(`[Razorpay Webhook] Event: ${eventType}`);
+
+    // Handle key events
+    switch (eventType) {
+      case 'subscription.charged':
+        console.log('[Razorpay Webhook] Subscription charged:', event.payload?.subscription?.entity?.id);
+        break;
+      case 'subscription.cancelled':
+        console.log('[Razorpay Webhook] Subscription cancelled:', event.payload?.subscription?.entity?.id);
+        break;
+      case 'subscription.paused':
+        console.log('[Razorpay Webhook] Subscription paused:', event.payload?.subscription?.entity?.id);
+        break;
+      case 'payment.captured':
+        console.log('[Razorpay Webhook] Payment captured:', event.payload?.payment?.entity?.id);
+        break;
+      default:
+        console.log('[Razorpay Webhook] Unhandled event:', eventType);
+    }
+
+    return res.json({ status: 'ok' });
+  } catch (err: any) {
+    console.error('[Razorpay Webhook] Error:', err);
+    return res.status(500).json({ error: 'Webhook processing error' });
+  }
+});
+
 // Serve health status
 app.get('/api/health', (req, res) => {
   res.json({
@@ -318,30 +499,26 @@ app.get('/api/health', (req, res) => {
     service: 'Elite HR Server',
     hasGroqKey: !!process.env.GROQ_API_KEY,
     hasGoogleRefresh: !!(process.env.GOOGLE_CLIENT_SECRET && (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID)),
+    hasRazorpay: !!(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
   });
 });
 
-// Configure Vite or Static Asset delivery
-async function setupViteOrStatic() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+// ─── Start API server ──────────────────────────────────────
+// In dev: Express runs on port 3001, Vite (port 3000) proxies /api to it
+// In prod: Express serves both API and static files on port 3000
+const API_PORT = process.env.NODE_ENV === 'production' ? PORT : 3001;
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server executing at http://0.0.0.0:${PORT}`);
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 }
 
-setupViteOrStatic().catch((err) => {
-  console.error('Server setup failure:', err);
+app.listen(API_PORT, '0.0.0.0', () => {
+  console.log(`[JobSetu API] Server running at http://localhost:${API_PORT}`);
+  if (API_PORT === 3001) {
+    console.log(`[JobSetu API] Vite dev server should run on port 3000 — API calls proxied via /api`);
+  }
 });

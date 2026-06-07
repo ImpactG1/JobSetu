@@ -1,4 +1,4 @@
-export type ActiveTab = 'home' | 'profile' | 'ats-checker' | 'discovery' | 'inbox' | 'referrals' | 'analytics' | 'settings' | 'admin';
+export type ActiveTab = 'home' | 'profile' | 'ats-checker' | 'discovery' | 'inbox' | 'referrals' | 'analytics' | 'settings' | 'admin' | 'pricing';
 
 export interface UserProfile {
   name: string;
@@ -281,4 +281,80 @@ export interface UserProfileData {
   ats_analysis?: ATSAnalysis | Record<string, unknown>;
   updated_at: string;
   created_at: string;
+}
+
+// ─── Subscription & Payment Types ─────────────────────────
+
+export type PlanTier = 'free' | 'basic' | 'premium';
+export type BillingCycle = 'monthly' | 'yearly';
+export type SubscriptionStatus = 'active' | 'cancelled' | 'expired' | 'paused';
+
+export interface UserSubscription {
+  id: string;
+  user_id: string;
+  plan: PlanTier;
+  billing_cycle: BillingCycle;
+  status: SubscriptionStatus;
+  razorpay_subscription_id: string;
+  razorpay_customer_id: string;
+  current_period_start: string;
+  current_period_end: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyUsage {
+  id: string;
+  user_id: string;
+  usage_date: string;
+  direct_job_applies: number;
+  referral_clicks: number;
+  created_at: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  user_id: string;
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+  amount: number;
+  currency: string;
+  plan: PlanTier;
+  billing_cycle: BillingCycle;
+  status: 'captured' | 'failed' | 'refunded';
+  paid_at: string;
+  created_at: string;
+}
+
+export interface ReferralClick {
+  id: string;
+  user_id: string;
+  referral_id: string;
+  company: string;
+  job_titles: string;
+  referral_form_link: string;
+  clicked_at: string;
+}
+
+export interface DirectJobApply {
+  id: string;
+  user_id: string;
+  job_id: string;
+  company: string;
+  job_title: string;
+  apply_method: 'email' | 'link';
+  applied_at: string;
+}
+
+export interface PlanLimits {
+  directJobsPerDay: number;
+  referralsPerDay: number;
+}
+
+export interface UsageCheck {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
 }

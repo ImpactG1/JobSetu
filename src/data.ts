@@ -495,7 +495,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     subject: 'Executive Leadership Opportunity | Discussion regarding {company}',
     category: 'Cold Outreach',
     variables: ['{first_name}', '{company}', '{position}'],
-    body: "Dear {first_name},\n\nI have been closely following the impressive growth of {company} and your recent leadership in the expansion strategy. Your background in scaling high-performance teams is exactly the type of expertise we are currently seeking for an exclusive executive search on behalf of a Tier-1 Venture firm.\n\nThe role is a Confidential VP of Talent position for a Series C fintech disruptor. Given your trajectory, I would love to schedule a brief introductory call to discuss the landscape and see if this aligns with your next strategic career pivot.\n\nAre you available for a 15-minute conversation on Tuesday afternoon?\n\nWarmly,\n\n{sender_name}\nElite HR Global"
+    body: "Dear {first_name},\n\nI have been closely following the impressive growth of {company} and your recent leadership in the expansion strategy. Your background in scaling high-performance teams is exactly the type of expertise we are currently seeking for an exclusive executive search on behalf of a Tier-1 Venture firm.\n\nThe role is a Confidential VP of Talent position for a Series C fintech disruptor. Given your trajectory, I would love to schedule a brief introductory call to discuss the landscape and see if this aligns with your next strategic career pivot.\n\nAre you available for a 15-minute conversation on Tuesday afternoon?\n\nWarmly,\n\n{sender_name}\nReflyt"
   },
   {
     id: 'temp-2',

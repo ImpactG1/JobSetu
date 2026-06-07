@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   X,
+  Crown,
 } from 'lucide-react';
 import { ActiveTab, UserProfile } from '../types';
 
@@ -51,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'inbox' as ActiveTab, label: 'Inbox', icon: Mail, badge: unreadCount },
     { id: 'referrals' as ActiveTab, label: 'Referrals', icon: Users },
     { id: 'analytics' as ActiveTab, label: 'Analytics', icon: BarChart3 },
+    { id: 'pricing' as ActiveTab, label: 'Plans', icon: Crown },
     { id: 'settings' as ActiveTab, label: 'Settings', icon: Settings },
     ...(isAdmin ? [{ id: 'admin' as ActiveTab, label: 'Admin Panel', icon: ShieldCheck }] : []),
   ];
@@ -92,15 +94,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className={`flex items-center ${showLabels ? 'space-x-2.5 min-w-0' : ''}`}>
             <div className="w-8 h-8 rounded bg-neutral-900 flex items-center justify-center font-serif-display text-white text-base font-bold shrink-0">
-              E
+              R
             </div>
             {showLabels && (
               <div className="min-w-0">
                 <h1 className="font-serif-display text-lg font-bold tracking-tight text-neutral-900 leading-tight truncate">
-                  Elite HR
+                  Reflyt
                 </h1>
                 <p className="font-sans text-[10px] tracking-widest text-neutral-400 font-medium">
-                  EXECUTIVE PORTAL
+                  CAREER PORTAL
                 </p>
               </div>
             )}

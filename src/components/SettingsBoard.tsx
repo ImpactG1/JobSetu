@@ -153,7 +153,7 @@ export const SettingsBoard: React.FC<SettingsBoardProps> = ({
 
             <div className="space-y-3.5 text-xs text-amber-950/80 leading-relaxed font-light">
               <p>
-                Elite HR operates a custom Node.js Express server to securely manage LLM credentials. This prevents exposing secret API keys directly to candidate browser consoles.
+                Reflyt operates a custom Node.js Express server to securely manage LLM credentials. This prevents exposing secret API keys directly to candidate browser consoles.
               </p>
               
               <div className="p-3 bg-white/60 border border-amber-100 rounded-lg space-y-1">
@@ -167,7 +167,7 @@ export const SettingsBoard: React.FC<SettingsBoardProps> = ({
               </div>
 
               <div className="text-[11px] text-amber-900/60 leading-normal">
-                *If no key is configured, Elite HR automatically engages our custom local NLP processing dictionary to format beautiful Formal, Warm, or Concise outreach drafts without disrupting UI functionality.
+                *If no key is configured, Reflyt automatically engages our custom local NLP processing dictionary to format beautiful Formal, Warm, or Concise outreach drafts without disrupting UI functionality.
               </div>
             </div>
           </div>
