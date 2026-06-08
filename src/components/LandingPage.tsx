@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Briefcase, Mail, Users, Sparkles, CheckCircle2,
-  UploadCloud, Star, ChevronRight, Shield, TrendingUp, Zap,
+  UploadCloud, Star, ChevronRight, Shield, TrendingUp,
   FileText, ClipboardCheck, Search, Target, Award, Globe,
   Menu, X
 } from 'lucide-react';
@@ -75,7 +75,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateAuth, onNavi
     { name: 'Sneha Reddy', role: 'Data Analyst at Microsoft', text: 'Love how I can email HRs directly and track everything. Way better than randomly applying on job boards.' },
   ];
 
-  const s1 = useInView(); const s2 = useInView(); const s3 = useInView();
+  const s2 = useInView(); const s3 = useInView();
   const s4 = useInView(); const s5 = useInView(); const s6 = useInView();
 
   return (
@@ -121,49 +121,203 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateAuth, onNavi
         )}
       </nav>
 
-      {/* ═══ HERO ═══ */}
-      <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-28 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-amber-100/40 to-transparent rounded-full -mr-48 animate-lp-float" />
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-blue-100/30 to-transparent rounded-full -ml-32 animate-lp-float-delayed" />
-          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #1a1a1a 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+      {/* ═══ HERO — Two-Column Grid ═══ */}
+      <section className="relative overflow-hidden" style={{ minHeight: 'calc(100vh - 64px)', paddingTop: '64px' }}>
+        {/* Background dot grid */}
+        <div className="absolute inset-0 hero-dot-grid pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 h-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center" style={{ minHeight: 'calc(100vh - 64px - 52px)' }}>
+            
+            {/* LEFT COLUMN — Content */}
+            <div className="space-y-8 pt-12 md:pt-0">
+              {/* Micro label */}
+              <div className="hero-animate hero-animate-d1">
+                <span
+                  className="inline-block px-3 py-1 border rounded-sm text-[10px] uppercase tracking-[0.18em] font-semibold"
+                  style={{ fontFamily: 'var(--font-syne)', borderColor: '#d4d0c8', color: '#6B6B6B' }}
+                >
+                  Career Intelligence Platform
+                </span>
+              </div>
+
+              {/* Headline */}
+              <h1 className="hero-animate hero-animate-d2">
+                <span
+                  className="block text-[48px] sm:text-[56px] lg:text-[72px] font-bold leading-[0.95] tracking-[-0.03em] text-[#1A1A1A]"
+                  style={{ fontFamily: 'var(--font-sans)' }}
+                >
+                  Your Career,
+                </span>
+                <span
+                  className="block font-serif italic text-[48px] sm:text-[56px] lg:text-[72px] leading-[1.05] tracking-[-0.02em] text-[#1A1A1A] mt-1"
+                >
+                  Reimagined.
+                </span>
+              </h1>
+
+              {/* Body text */}
+              <p className="hero-animate hero-animate-d3 text-[15px] sm:text-base leading-[1.7] text-[#6B6B6B] max-w-md" style={{ fontFamily: 'var(--font-sans)' }}>
+                Curated jobs, direct HR emails, employee referrals, and a free AI‑powered ATS checker — everything you need to land your next role, in one place.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="hero-animate hero-animate-d4 flex flex-col sm:flex-row items-start gap-3">
+                <button
+                  onClick={onNavigateAuth}
+                  className="group px-7 py-3.5 bg-[#1A1A1A] hover:bg-[#2a2a2a] text-white text-[11px] font-bold uppercase tracking-[0.16em] rounded-lg transition-all duration-200 flex items-center gap-2.5 elite-button"
+                  style={{ fontFamily: 'var(--font-syne)' }}
+                >
+                  Start For Free
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+                <button
+                  onClick={onNavigateATS}
+                  className="px-7 py-3.5 border text-[11px] font-bold uppercase tracking-[0.16em] rounded-lg transition-all duration-200 flex items-center gap-2.5 elite-button hover:bg-[#f5f4f1]"
+                  style={{ fontFamily: 'var(--font-syne)', borderColor: '#d4d0c8', color: '#4a4a4a' }}
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  Check ATS Score
+                </button>
+              </div>
+
+              {/* Stats Strip */}
+              <div className="hero-animate hero-animate-d5 flex items-center gap-6 sm:gap-8 pt-4 flex-wrap">
+                {[
+                  { val: 2500, suffix: '+', label: 'Job Listings' },
+                  { val: 800, suffix: '+', label: 'HR Emails' },
+                  { val: 15000, suffix: '+', label: 'Resumes Scanned' },
+                ].map((s, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <div className="stat-divider hidden sm:block" />}
+                    <div className="text-left">
+                      <div className="text-[22px] sm:text-[26px] font-bold text-[#1A1A1A] leading-none font-serif">
+                        <AnimatedNumber target={s.val} />{s.suffix}
+                      </div>
+                      <div
+                        className="text-[9px] uppercase tracking-[0.14em] mt-1.5"
+                        style={{ fontFamily: 'var(--font-syne)', color: '#999' }}
+                      >
+                        {s.label}
+                      </div>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN — Animated Orbital Composition */}
+            <div className="hero-right-col hidden md:flex">
+              {/* Ghost letter */}
+              <div className="hero-ghost-letter" aria-hidden="true">R</div>
+              
+              {/* Breathing glow */}
+              <div className="hero-accent-glow" />
+
+              {/* Rotating orbit rings with traveling dots */}
+              <div className="hero-orbit hero-orbit--outer">
+                <span className="orbit-dot" style={{ top: 0, left: '50%' }} />
+                <span className="orbit-dot" style={{ bottom: 0, left: '50%' }} />
+                <span className="orbit-dot" style={{ top: '50%', right: 0 }} />
+              </div>
+              <div className="hero-orbit hero-orbit--mid">
+                <span className="orbit-dot" style={{ top: 0, left: '50%' }} />
+                <span className="orbit-dot" style={{ top: '50%', left: 0 }} />
+              </div>
+              <div className="hero-orbit hero-orbit--inner">
+                <span className="orbit-dot" style={{ bottom: 0, left: '50%' }} />
+              </div>
+
+              {/* Decorative connectors */}
+              <div className="hero-connector" style={{ width: '80px', top: '30%', left: '8%', transform: 'rotate(-25deg)' }} />
+              <div className="hero-connector" style={{ width: '60px', bottom: '28%', right: '10%', transform: 'rotate(20deg)' }} />
+
+              {/* Center logo — pulsing */}
+              <div className="hero-center-logo w-20 h-20 rounded-2xl bg-[#1A1A1A] flex items-center justify-center shadow-2xl">
+                <span className="font-serif text-white text-3xl font-bold">R</span>
+              </div>
+
+              {/* Floating icon cards with unique animations */}
+              <div className="hero-float-icon hero-float-icon--1 rounded-xl bg-white border border-[#ecebe6] w-[52px] h-[52px] flex items-center justify-center shadow-lg" style={{ top: '12%', left: '12%' }}>
+                <Mail className="w-5 h-5 text-[#1A1A1A]" />
+              </div>
+              <div className="hero-float-icon hero-float-icon--2 rounded-xl bg-white border border-[#ecebe6] w-12 h-12 flex items-center justify-center shadow-lg" style={{ top: '8%', right: '18%' }}>
+                <Briefcase className="w-5 h-5 text-[#1A1A1A]" />
+              </div>
+              <div className="hero-float-icon hero-float-icon--3 rounded-xl bg-white border border-[#ecebe6] w-12 h-12 flex items-center justify-center shadow-lg" style={{ bottom: '18%', left: '8%' }}>
+                <Users className="w-5 h-5 text-[#1A1A1A]" />
+              </div>
+              <div className="hero-float-icon hero-float-icon--4 rounded-[14px] bg-white border border-[#ecebe6] w-[52px] h-[52px] flex items-center justify-center shadow-lg" style={{ bottom: '12%', right: '14%' }}>
+                <Sparkles className="w-5 h-5 text-[#1A1A1A]" />
+              </div>
+              <div className="hero-float-icon hero-float-icon--5 rounded-lg bg-white border border-[#ecebe6] w-10 h-10 flex items-center justify-center shadow-md" style={{ top: '48%', right: '4%' }}>
+                <TrendingUp className="w-4 h-4 text-[#1A1A1A]" />
+              </div>
+              <div className="hero-float-icon hero-float-icon--6 rounded-lg bg-white border border-[#ecebe6] w-10 h-10 flex items-center justify-center shadow-md" style={{ top: '42%', left: '3%' }}>
+                <FileText className="w-4 h-4 text-[#1A1A1A]" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-8 animate-lp-slide-up">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-100 text-amber-800 text-[11px] font-bold uppercase tracking-wider animate-lp-slide-up">
-              <Zap className="w-3.5 h-3.5" /> Free ATS Resume Checker — No Signup Required
-            </div>
-            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-neutral-900 leading-[1.1] tracking-tight animate-lp-slide-up stagger-1">
-              Your Career,{' '}
-              <span className="bg-gradient-to-r from-neutral-900 via-neutral-600 to-neutral-900 bg-clip-text text-transparent">Reimagined</span>
-            </h1>
-            <p className="text-base sm:text-lg text-neutral-500 font-light leading-relaxed max-w-2xl mx-auto animate-lp-slide-up stagger-2">
-              Get curated job listings, direct HR emails, employee referrals, and a free AI-powered ATS checker — everything you need to land your dream role, in one place.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-lp-slide-up stagger-3">
-              <button onClick={onNavigateAuth} className="w-full sm:w-auto px-8 py-3.5 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl transition-all elite-button flex items-center justify-center gap-2">
-                Start For Free <ArrowRight className="w-4 h-4" />
-              </button>
-              <button onClick={onNavigateATS} className="w-full sm:w-auto px-8 py-3.5 border border-neutral-300 hover:border-neutral-400 text-neutral-700 text-sm font-bold uppercase tracking-wider rounded-xl transition-all elite-button flex items-center justify-center gap-2">
-                <ClipboardCheck className="w-4 h-4" /> Check Your ATS Score
-              </button>
-            </div>
-            <p className="text-[11px] text-neutral-400 animate-lp-slide-up stagger-3">No credit card required · Free forever plan available</p>
-          </div>
-
-          {/* Stats bar */}
-          <div ref={s1.ref} className={`mt-16 max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 transition-all duration-700 ${s1.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+        {/* ═══ TICKER STRIP ═══ */}
+        <div className="w-full overflow-hidden" style={{ backgroundColor: '#1A1A1A', padding: '10px 0' }}>
+          <div className="ticker-track">
+            {/* First set of items */}
             {[
-              { val: 2500, suffix: '+', label: 'Job Listings' },
-              { val: 800, suffix: '+', label: 'HR Emails' },
-              { val: 350, suffix: '+', label: 'Referral Links' },
-              { val: 15000, suffix: '+', label: 'Resumes Scanned' },
-            ].map((s, i) => (
-              <div key={i} className="text-center p-4 rounded-xl bg-white border border-[#ecebe6] elite-card-shadow">
-                <div className="text-2xl font-serif font-bold text-neutral-900"><AnimatedNumber target={s.val} />{s.suffix}</div>
-                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mt-1">{s.label}</div>
-              </div>
+              'Free ATS Resume Checker',
+              'Direct HR Email Access',
+              'Employee Referral Network',
+              'AI-Powered Drafts',
+              'No Signup Required',
+              'Free Forever Plan',
+            ].map((item, i) => (
+              <span key={`a-${i}`} className="flex items-center shrink-0 px-5">
+                <span
+                  className="whitespace-nowrap"
+                  style={{
+                    fontFamily: 'var(--font-syne)',
+                    fontSize: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.14em',
+                    color: '#E8E4DC',
+                  }}
+                >
+                  {item}
+                </span>
+                <span
+                  className="inline-block rounded-full ml-5 shrink-0"
+                  style={{ width: '3px', height: '3px', backgroundColor: '#6B6B6B' }}
+                />
+              </span>
+            ))}
+            {/* Duplicate set for seamless loop */}
+            {[
+              'Free ATS Resume Checker',
+              'Direct HR Email Access',
+              'Employee Referral Network',
+              'AI-Powered Drafts',
+              'No Signup Required',
+              'Free Forever Plan',
+            ].map((item, i) => (
+              <span key={`b-${i}`} className="flex items-center shrink-0 px-5">
+                <span
+                  className="whitespace-nowrap"
+                  style={{
+                    fontFamily: 'var(--font-syne)',
+                    fontSize: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.14em',
+                    color: '#E8E4DC',
+                  }}
+                >
+                  {item}
+                </span>
+                <span
+                  className="inline-block rounded-full ml-5 shrink-0"
+                  style={{ width: '3px', height: '3px', backgroundColor: '#6B6B6B' }}
+                />
+              </span>
             ))}
           </div>
         </div>

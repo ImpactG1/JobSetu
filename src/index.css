@@ -1,10 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-syne: "Syne", sans-serif;
 }
 
 /* Base style resets and customizations */
@@ -68,4 +69,227 @@ body {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HERO SECTION — Two-Column Layout + Ticker Strip
+   ═══════════════════════════════════════════════════════════ */
+
+/* Marquee infinite scroll animation */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  display: flex;
+  animation: marquee 30s linear infinite;
+  width: max-content;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Hero ghost decorative letter */
+.hero-ghost-letter {
+  position: absolute;
+  right: -2%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-serif);
+  font-size: clamp(280px, 30vw, 420px);
+  font-weight: 900;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(26, 26, 26, 0.06);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+/* Hero dot grid pattern */
+.hero-dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(26, 26, 26, 0.04) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+/* Hero entrance animations */
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.hero-animate {
+  animation: hero-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.hero-animate-d1 { animation-delay: 0.1s; }
+.hero-animate-d2 { animation-delay: 0.25s; }
+.hero-animate-d3 { animation-delay: 0.4s; }
+.hero-animate-d4 { animation-delay: 0.55s; }
+.hero-animate-d5 { animation-delay: 0.7s; }
+
+/* Stats strip divider lines */
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(26, 26, 26, 0.08);
+  flex-shrink: 0;
+}
+
+/* Hero right column — animated orbital composition */
+.hero-right-col {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 480px;
+}
+
+/* ── Orbit rings ── */
+@keyframes orbit-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes orbit-spin-reverse {
+  from { transform: translate(-50%, -50%) rotate(360deg); }
+  to   { transform: translate(-50%, -50%) rotate(0deg); }
+}
+
+.hero-orbit {
+  position: absolute;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  pointer-events: none;
+}
+
+.hero-orbit--outer {
+  width: 380px;
+  height: 380px;
+  border: 1px solid rgba(26, 26, 26, 0.05);
+  animation: orbit-spin 45s linear infinite;
+}
+.hero-orbit--mid {
+  width: 270px;
+  height: 270px;
+  border: 1px dashed rgba(26, 26, 26, 0.07);
+  animation: orbit-spin-reverse 35s linear infinite;
+}
+.hero-orbit--inner {
+  width: 160px;
+  height: 160px;
+  border: 1px solid rgba(26, 26, 26, 0.04);
+  animation: orbit-spin 25s linear infinite;
+}
+
+/* Dots placed on orbits — they visually travel the ring */
+.orbit-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(26, 26, 26, 0.12);
+}
+
+/* ── Center logo pulse ── */
+@keyframes center-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 26, 26, 0.08); }
+  50%      { box-shadow: 0 0 0 20px rgba(26, 26, 26, 0); }
+}
+.hero-center-logo {
+  position: relative;
+  z-index: 10;
+  animation: center-pulse 3s ease-in-out infinite;
+}
+
+/* ── Floating icon cards ── */
+@keyframes float-1 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%      { transform: translateY(-12px) rotate(2deg); }
+  66%      { transform: translateY(4px) rotate(-1deg); }
+}
+@keyframes float-2 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  25%      { transform: translateY(6px) rotate(-2deg); }
+  75%      { transform: translateY(-14px) rotate(1.5deg); }
+}
+@keyframes float-3 {
+  0%, 100% { transform: translateY(-4px) scale(1); }
+  50%      { transform: translateY(8px) scale(1.04); }
+}
+@keyframes float-4 {
+  0%, 100% { transform: translate(0, 0); }
+  30%      { transform: translate(6px, -10px); }
+  70%      { transform: translate(-4px, 6px); }
+}
+
+.hero-float-icon {
+  position: absolute;
+  z-index: 10;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+.hero-float-icon:hover {
+  transform: scale(1.18) !important;
+  box-shadow: 0 8px 32px rgba(26, 26, 26, 0.12) !important;
+}
+
+.hero-float-icon--1 { animation: float-1 6s ease-in-out infinite; }
+.hero-float-icon--2 { animation: float-2 7s ease-in-out infinite; animation-delay: -1s; }
+.hero-float-icon--3 { animation: float-3 5s ease-in-out infinite; animation-delay: -2s; }
+.hero-float-icon--4 { animation: float-4 8s ease-in-out infinite; animation-delay: -0.5s; }
+.hero-float-icon--5 { animation: float-1 6.5s ease-in-out infinite; animation-delay: -3s; }
+.hero-float-icon--6 { animation: float-2 5.5s ease-in-out infinite; animation-delay: -2.5s; }
+
+/* ── Animated glow ── */
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: 0.7; transform: translate(-50%, -50%) scale(1.15); }
+}
+.hero-accent-glow {
+  position: absolute;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(26, 26, 26, 0.035) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: glow-breathe 5s ease-in-out infinite;
+}
+
+/* ── Connector lines (decorative) ── */
+.hero-connector {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(26,26,26,0.06), transparent);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Responsive — stack on mobile */
+@media (max-width: 767px) {
+  .hero-ghost-letter {
+    display: none;
+  }
+  .hero-right-col {
+    min-height: 240px;
+  }
+  .hero-orbit--outer { width: 260px; height: 260px; }
+  .hero-orbit--mid   { width: 180px; height: 180px; }
+  .hero-orbit--inner { width: 110px; height: 110px; }
 }
