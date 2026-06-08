@@ -508,7 +508,7 @@ app.get('/api/health', (req, res) => {
 // In prod: Express serves both API and static files on port 3000
 const API_PORT = process.env.NODE_ENV === 'production' ? PORT : 3001;
 
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const distPath = path.join(process.cwd(), 'dist');
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
@@ -516,9 +516,13 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(API_PORT, '0.0.0.0', () => {
-  console.log(`[JobSetu API] Server running at http://localhost:${API_PORT}`);
-  if (API_PORT === 3001) {
-    console.log(`[JobSetu API] Vite dev server should run on port 3000 — API calls proxied via /api`);
-  }
-});
+if (!process.env.VERCEL) {
+  app.listen(API_PORT, '0.0.0.0', () => {
+    console.log(`[JobSetu API] Server running at http://localhost:${API_PORT}`);
+    if (API_PORT === 3001) {
+      console.log(`[JobSetu API] Vite dev server should run on port 3000 — API calls proxied via /api`);
+    }
+  });
+}
+
+export default app;
