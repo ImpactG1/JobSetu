@@ -13,6 +13,8 @@ import { AdminPanel } from './components/AdminPanel';
 import { PricingBoard } from './components/PricingBoard';
 import { AuthPage } from './components/AuthPage';
 import { LandingPage } from './components/LandingPage';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { TermsOfService } from './components/TermsOfService';
 import { useAuth } from './context/AuthContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { checkIsAdmin } from './lib/adminConfig';
@@ -28,7 +30,7 @@ import {
   EMAIL_TEMPLATES 
 } from './data';
 
-type PublicPage = 'landing' | 'auth' | 'ats';
+type PublicPage = 'landing' | 'auth' | 'ats' | 'privacy' | 'terms';
 
 export default function App() {
   const { user, loading, signOut } = useAuth();
@@ -64,7 +66,13 @@ export default function App() {
 
   if (!user) {
     if (publicPage === 'auth') {
-      return <AuthPage onBack={() => setPublicPage('landing')} />;
+      return (
+        <AuthPage
+          onBack={() => setPublicPage('landing')}
+          onNavigatePrivacy={() => setPublicPage('privacy')}
+          onNavigateTerms={() => setPublicPage('terms')}
+        />
+      );
     }
     if (publicPage === 'ats') {
       return (
@@ -85,8 +93,61 @@ export default function App() {
           <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
             <ATSCheckerBoard />
           </main>
-          <footer className="border-t border-[#ecebe6] py-6 text-center text-[10px] text-neutral-400">
-            © {new Date().getFullYear()} Reflyt. Free ATS checker — no signup required.
+          <footer className="border-t border-[#ecebe6] py-6 text-center text-[10px] text-neutral-400 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p>© {new Date().getFullYear()} Reflyt. Free ATS checker — no signup required.</p>
+            <div className="flex items-center gap-4">
+              <button onClick={() => setPublicPage('privacy')} className="hover:text-neutral-600 transition-colors cursor-pointer">Privacy Policy</button>
+              <span className="text-neutral-300">•</span>
+              <button onClick={() => setPublicPage('terms')} className="hover:text-neutral-600 transition-colors cursor-pointer">Terms of Service</button>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+    if (publicPage === 'privacy') {
+      return (
+        <div className="min-h-screen bg-[#faf9f6] flex flex-col justify-between">
+          <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#ecebe6]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
+              <button onClick={() => setPublicPage('landing')} className="flex items-center space-x-2 group">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 flex items-center justify-center font-serif text-white text-sm font-bold">R</div>
+                <span className="font-serif text-base font-bold text-neutral-900 tracking-tight group-hover:text-neutral-600 transition-colors">Reflyt</span>
+              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setPublicPage('auth')} className="text-xs font-bold text-neutral-600 hover:text-neutral-900 px-3 py-1.5 transition-colors">Sign In</button>
+                <button onClick={() => setPublicPage('auth')} className="text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2 rounded-lg transition-all elite-button">Join Free</button>
+              </div>
+            </div>
+          </header>
+          <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4">
+            <PrivacyPolicy onBack={() => setPublicPage('landing')} />
+          </main>
+          <footer className="border-t border-[#ecebe6] py-6 text-center text-[10px] text-neutral-400 bg-white">
+            © {new Date().getFullYear()} Reflyt. All rights reserved.
+          </footer>
+        </div>
+      );
+    }
+    if (publicPage === 'terms') {
+      return (
+        <div className="min-h-screen bg-[#faf9f6] flex flex-col justify-between">
+          <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#ecebe6]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
+              <button onClick={() => setPublicPage('landing')} className="flex items-center space-x-2 group">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 flex items-center justify-center font-serif text-white text-sm font-bold">R</div>
+                <span className="font-serif text-base font-bold text-neutral-900 tracking-tight group-hover:text-neutral-600 transition-colors">Reflyt</span>
+              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setPublicPage('auth')} className="text-xs font-bold text-neutral-600 hover:text-neutral-900 px-3 py-1.5 transition-colors">Sign In</button>
+                <button onClick={() => setPublicPage('auth')} className="text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2 rounded-lg transition-all elite-button">Join Free</button>
+              </div>
+            </div>
+          </header>
+          <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4">
+            <TermsOfService onBack={() => setPublicPage('landing')} />
+          </main>
+          <footer className="border-t border-[#ecebe6] py-6 text-center text-[10px] text-neutral-400 bg-white">
+            © {new Date().getFullYear()} Reflyt. All rights reserved.
           </footer>
         </div>
       );
@@ -95,6 +156,8 @@ export default function App() {
       <LandingPage
         onNavigateAuth={() => setPublicPage('auth')}
         onNavigateATS={() => setPublicPage('ats')}
+        onNavigatePrivacy={() => setPublicPage('privacy')}
+        onNavigateTerms={() => setPublicPage('terms')}
       />
     );
   }
@@ -291,6 +354,10 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
         return isAdmin ? <AdminPanel /> : <div className="p-8 bg-white border border-[#ecebe6] rounded-xl text-center text-xs text-neutral-400">Access denied.</div>;
       case 'pricing':
         return <PricingBoard />;
+      case 'privacy':
+        return <PrivacyPolicy onBack={() => handleSetActiveTab('home')} />;
+      case 'terms':
+        return <TermsOfService onBack={() => handleSetActiveTab('home')} />;
       default:
         return <div className="p-8 bg-white border border-[#ecebe6] rounded-xl text-center text-xs text-neutral-400 font-light">View nodes under maintenance.</div>;
     }
@@ -325,8 +392,18 @@ function DashboardLayout({ onSignOut, userEmail, userName, userId }: { onSignOut
           onToggleSidebarCollapse={toggleSidebarCollapsed}
           isSidebarCollapsed={sidebarCollapsed}
         />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 max-w-7xl w-full mx-auto space-y-4">
-          {renderActiveView()}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 max-w-7xl w-full mx-auto flex flex-col justify-between gap-8">
+          <div className="flex-1 space-y-4">
+            {renderActiveView()}
+          </div>
+          <footer className="pt-8 pb-4 border-t border-[#ecebe6]/60 text-center text-[10px] text-neutral-400 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+            <p>© {new Date().getFullYear()} Reflyt. All rights reserved.</p>
+            <div className="flex items-center gap-4">
+              <button onClick={() => handleSetActiveTab('privacy')} className="hover:text-neutral-600 transition-colors cursor-pointer">Privacy Policy</button>
+              <span className="text-neutral-300">•</span>
+              <button onClick={() => handleSetActiveTab('terms')} className="hover:text-neutral-600 transition-colors cursor-pointer">Terms of Service</button>
+            </div>
+          </footer>
         </main>
       </div>
     </div>

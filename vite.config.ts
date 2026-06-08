@@ -16,7 +16,11 @@ export default defineConfig(() => {
     },
     server: {
       port: 3000,
-      hmr: process.env.DISABLE_HMR !== 'true',
+      host: '127.0.0.1',
+      hmr: process.env.DISABLE_HMR === 'true' ? false : {
+        host: '127.0.0.1',
+        port: 3000,
+      },
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       // Proxy API calls to Express server running on port 3001
       proxy: {

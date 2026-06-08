@@ -17,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 
 type AuthMode = 'login' | 'signup';
 
-export const AuthPage: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
+export const AuthPage: React.FC<{ onBack?: () => void; onNavigatePrivacy?: () => void; onNavigateTerms?: () => void }> = ({ onBack, onNavigatePrivacy, onNavigateTerms }) => {
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -499,8 +499,23 @@ export const AuthPage: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-[10px] text-neutral-300 font-light leading-relaxed pt-4">
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+          <p className="text-center text-[10px] text-neutral-400 font-light leading-relaxed pt-4">
+            By continuing, you agree to our{' '}
+            <button
+              type="button"
+              onClick={onNavigateTerms}
+              className="underline hover:text-neutral-600 transition-colors cursor-pointer"
+            >
+              Terms of Service
+            </button>{' '}
+            and{' '}
+            <button
+              type="button"
+              onClick={onNavigatePrivacy}
+              className="underline hover:text-neutral-600 transition-colors cursor-pointer"
+            >
+              Privacy Policy
+            </button>.
             <br />
             Protected by industry-grade encryption.
           </p>

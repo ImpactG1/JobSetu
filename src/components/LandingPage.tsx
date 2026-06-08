@@ -9,6 +9,8 @@ import {
 interface LandingPageProps {
   onNavigateAuth: () => void;
   onNavigateATS: () => void;
+  onNavigatePrivacy: () => void;
+  onNavigateTerms: () => void;
 }
 
 /* ── Intersection Observer hook ── */
@@ -43,7 +45,7 @@ function AnimatedNumber({ target, duration = 1800 }: { target: number; duration?
   return <span ref={ref}>{val.toLocaleString()}</span>;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateAuth, onNavigateATS }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateAuth, onNavigateATS, onNavigatePrivacy, onNavigateTerms }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -501,10 +503,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateAuth, onNavi
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-serif text-white text-sm font-bold">R</div>
               <span className="font-serif text-lg font-bold tracking-tight">Reflyt</span>
             </div>
-            <div className="flex items-center gap-6 text-xs text-neutral-500">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-neutral-500 justify-center md:justify-start">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
               <a href="#ats-checker" className="hover:text-white transition-colors">ATS Checker</a>
               <a href="#testimonials" className="hover:text-white transition-colors">Reviews</a>
+              <span className="text-neutral-700 hidden sm:inline">|</span>
+              <button onClick={onNavigatePrivacy} className="hover:text-white transition-colors cursor-pointer">Privacy Policy</button>
+              <button onClick={onNavigateTerms} className="hover:text-white transition-colors cursor-pointer">Terms of Service</button>
             </div>
             <p className="text-[10px] text-neutral-600">© {new Date().getFullYear()} Reflyt. All rights reserved.</p>
           </div>

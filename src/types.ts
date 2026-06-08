@@ -1,4 +1,4 @@
-export type ActiveTab = 'home' | 'profile' | 'ats-checker' | 'discovery' | 'inbox' | 'referrals' | 'analytics' | 'settings' | 'admin' | 'pricing';
+export type ActiveTab = 'home' | 'profile' | 'ats-checker' | 'discovery' | 'inbox' | 'referrals' | 'analytics' | 'settings' | 'admin' | 'pricing' | 'privacy' | 'terms';
 
 export interface UserProfile {
   name: string;
